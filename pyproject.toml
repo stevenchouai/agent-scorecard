@@ -1,0 +1,17 @@
+[project]
+name = "agent-scorecard"
+version = "0.1.0"
+description = "Steven-specific trace-first agent evaluation harness"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Steven Chou"}]
+
+dependencies = []
+
+[project.scripts]
+agent-scorecard = "agent_scorecard.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
