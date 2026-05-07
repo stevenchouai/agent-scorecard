@@ -1,10 +1,23 @@
 # Agent Scorecard
 
+<p align="center">
+  <img src="assets/repo-eval-loop.svg" alt="Agent Scorecard trace-first evaluation loop" width="100%">
+</p>
+
 A small, trace-first evaluation harness for answering one practical question:
 
 > Is this agent worth Steven investing more tokens, permissions, and attention in?
 
 This is not a generic LLM benchmark. It scores agent work against Steven-specific operating standards: useful artifacts, tool discipline, verification, concise communication, memory/logging, and avoidance of performative busywork.
+
+## Part of StevenOS
+
+`agent-scorecard` is the **evaluation layer** in Steven's Personal AI Operating System.
+
+- **Upstream:** Hermes / OpenClaw / Codex-style traces from real agent work.
+- **This layer:** deterministic checks for tool discipline, verification, artifact creation, and concise handoff quality.
+- **Downstream:** autonomy decisions — which agents deserve more tokens, permissions, and attention.
+- **Proof:** Markdown reports that explain what passed, what failed, and why the task should or should not be delegated again.
 
 ## MVP scope
 
