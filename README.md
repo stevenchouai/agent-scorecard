@@ -47,6 +47,12 @@ JSONL, one event per line:
 {"type":"assistant","text":"Done: wrote /vault/wiki/outputs/report.md and verified it."}
 ```
 
+## What evidence is needed?
+
+See `docs/evaluation-inputs.md`.
+
+Short version: the scorer needs real traces with user ask, assistant messages, tool calls, artifacts, verification events, and failures. The next valuable improvement is trace collection from Hermes/OpenClaw runs, not adding more evaluator complexity.
+
 ## Repository status
 
 This is a v0 local repo. The first goal is a useful internal standard, not a polished platform.
