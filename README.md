@@ -28,9 +28,17 @@ This is not a generic LLM benchmark. It scores agent work against Steven-specifi
 
 ## Quick start
 
+Run one trace and inspect the verdict:
+
 ```bash
 PYTHONPATH=src python -m agent_scorecard.cli examples/traces/good_obsidian_task.jsonl
 PYTHONPATH=src python -m agent_scorecard.cli examples/traces/bad_busywork_task.jsonl --format markdown
+```
+
+Regenerate every public example report in one command:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --reports-dir examples/reports
 ```
 
 Or install locally first:
@@ -38,6 +46,7 @@ Or install locally first:
 ```bash
 python -m pip install -e .
 agent-scorecard examples/traces/good_obsidian_task.jsonl
+agent-scorecard --batch-dir examples/traces --reports-dir examples/reports
 ```
 
 ## Score bands

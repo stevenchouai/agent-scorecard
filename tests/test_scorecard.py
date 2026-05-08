@@ -50,3 +50,47 @@ def test_markdown_report_contains_failures():
     assert "# Agent Scorecard Report" in markdown
     assert "promised_action_executed" in markdown
     assert "Top failure modes" in markdown
+
+
+def test_cli_writes_single_report(tmp_path):
+    import json
+
+    from agent_scorecard.cli import main
+
+    trace = tmp_path / "trace.jsonl"
+    output = tmp_path / "report.md"
+    trace.write_text(
+        "\n".join(
+            json.dumps(event)
+            for event in [
+                {"type": "assistant", "text": "I will write a durable artifact."},
+                {"type": "tool_call", "tool": "write_file", "path": "/tmp/artifact.md"},
+                {"type": "tool_call", "tool": "read_file", "path": "/tmp/artifact.md"},
+                {"type": "assistant", "text": "Done: wrote and verified /tmp/artifact.md for Steven."},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert main([str(trace), "--output", str(output)]) == 0
+    assert output.exists()
+    assert "# Agent Scorecard Report" in output.read_text(encoding="utf-8")
+
+
+def test_cli_batch_generates_reports(tmp_path):
+    import json
+
+    from agent_scorecard.cli import main
+
+    traces = tmp_path / "traces"
+    reports = tmp_path / "reports"
+    traces.mkdir()
+    for name in ("good", "bad"):
+        (traces / f"{name}.jsonl").write_text(
+            json.dumps({"type": "assistant", "text": "Done: clear verdict for Steven."}),
+            encoding="utf-8",
+        )
+
+    assert main(["--batch-dir", str(traces), "--reports-dir", str(reports)]) == 0
+    assert (reports / "good.md").exists()
+    assert (reports / "bad.md").exists()
