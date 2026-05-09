@@ -19,6 +19,26 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def _synthetic_leaked_trace_jsonl() -> tuple[str, dict[str, str]]:
+    posix_path = "/" + "Users/example/PrivateVault/private-note.md"
+    windows_path = "C:" + "\\Users\\example\\Vault\\private-note.md"
+    secret_key = "api" + "_key"
+    secret_value = "SYNTHETIC_" + "SECRET_VALUE"
+    bearer_value = "SYNTHETIC_" + "BEARER_VALUE_12345"
+    feishu_id = "ou_" + "syntheticidentifier123"
+    text = (
+        f"{secret_key}={secret_value}; Authorization: {'Bearer'} {bearer_value}; "
+        f"open_id={feishu_id}; wrote {posix_path}; copied {windows_path}"
+    )
+    return json.dumps({"type": "tool_result", "tool": "terminal", "text": text}) + "\n", {
+        "posix_path": posix_path,
+        "windows_path": windows_path,
+        "secret_value": secret_value,
+        "bearer_value": bearer_value,
+        "feishu_id": feishu_id,
+    }
+
+
 class ScorecardTests(unittest.TestCase):
     def test_good_trace_scores_invest_more(self) -> None:
         from agent_scorecard.core import score_events
@@ -188,6 +208,68 @@ class ScorecardTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             main(["examples/traces/good_obsidian_task.jsonl", "--summary"])
 
+    def test_cli_audit_privacy_passes_clean_trace(self) -> None:
+        from agent_scorecard.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            trace = Path(tmp) / "clean.jsonl"
+            trace.write_text(
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "text": "Done: wrote <LOCAL_PATH>/scorecard-note.md and verified it.",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(main(["--audit-privacy", str(trace)]), 0)
+
+        self.assertIn("Privacy audit passed", stdout.getvalue())
+
+    def test_cli_audit_privacy_fails_synthetic_leaked_trace(self) -> None:
+        from agent_scorecard.cli import main
+
+        leaked_jsonl, leaked_values = _synthetic_leaked_trace_jsonl()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            trace = Path(tmp) / "leaked.jsonl"
+            trace.write_text(leaked_jsonl, encoding="utf-8")
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(main(["--audit-privacy", str(trace)]), 1)
+
+        output = stdout.getvalue()
+        self.assertIn("Privacy audit failed", output)
+        self.assertIn("local_path", output)
+        self.assertIn("secret", output)
+        self.assertIn("feishu_id", output)
+        for leaked_value in leaked_values.values():
+            self.assertNotIn(leaked_value, output)
+
+    def test_cli_audit_privacy_json_output_is_structured(self) -> None:
+        from agent_scorecard.cli import main
+
+        leaked_jsonl, leaked_values = _synthetic_leaked_trace_jsonl()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            trace = Path(tmp) / "leaked.jsonl"
+            trace.write_text(leaked_jsonl, encoding="utf-8")
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(main(["--audit-privacy", str(trace), "--format", "json"]), 1)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertFalse(payload["passed"])
+        self.assertIn("findings", payload)
+        self.assertIn("local_path", {finding["rule"] for finding in payload["findings"]})
+        self.assertTrue(all("location" in finding for finding in payload["findings"]))
+        rendered = json.dumps(payload)
+        for leaked_value in leaked_values.values():
+            self.assertNotIn(leaked_value, rendered)
+
 
 class HermesImportTests(unittest.TestCase):
     def test_fixture_contains_no_private_values(self) -> None:
@@ -330,6 +412,31 @@ class HermesImportTests(unittest.TestCase):
         self.assertNotIn(access_value, redacted)
         self.assertIn('"api_key": "[REDACTED]"', redacted)
         self.assertIn('"access_token": "[REDACTED]"', redacted)
+
+    def test_privacy_audit_passes_sanitized_jsonl(self) -> None:
+        from agent_scorecard.hermes_import import audit_privacy_jsonl
+
+        trace = (REPO_ROOT / "examples/traces/hermes_session_sanitized.jsonl").read_text(encoding="utf-8")
+        report = audit_privacy_jsonl(trace)
+
+        self.assertTrue(report.passed)
+        self.assertEqual(report.findings, ())
+
+    def test_privacy_audit_finds_synthetic_leaks(self) -> None:
+        from agent_scorecard.hermes_import import audit_privacy_jsonl
+
+        leaked_jsonl, leaked_values = _synthetic_leaked_trace_jsonl()
+        report = audit_privacy_jsonl(leaked_jsonl)
+
+        self.assertFalse(report.passed)
+        self.assertIn("local_path", {finding.rule for finding in report.findings})
+        self.assertIn("secret", {finding.rule for finding in report.findings})
+        self.assertIn("feishu_id", {finding.rule for finding in report.findings})
+        samples = " ".join(finding.sample for finding in report.findings)
+        for leaked_value in leaked_values.values():
+            self.assertNotIn(leaked_value, samples)
+        self.assertIn("[REDACTED]", samples)
+        self.assertIn("<LOCAL_PATH>", samples)
 
     def test_hermes_import_handles_minimal_and_malformed_sessions(self) -> None:
         from agent_scorecard.hermes_import import HermesImportError, import_hermes_session

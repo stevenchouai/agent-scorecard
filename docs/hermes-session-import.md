@@ -28,6 +28,17 @@ PYTHONPATH=src python3 -m agent_scorecard.cli \
 
 The generated demo trace is committed at `examples/traces/hermes_session_sanitized.jsonl`.
 
+## Audit the converted trace
+
+Before scoring or publishing a converted trace, run the privacy audit gate:
+
+```bash
+PYTHONPATH=src python3 -m agent_scorecard.cli \
+  --audit-privacy examples/traces/hermes_session_sanitized.jsonl
+```
+
+The command exits non-zero if it finds obvious secret values, Feishu/OpenPlatform IDs, or local private paths. Use `--format json` when another script needs structured pass/fail output.
+
 ## Score the converted trace
 
 Render a Markdown report from the converted JSONL:
@@ -47,4 +58,4 @@ The committed demo report is `examples/reports/hermes_session_sanitized.md`.
 - Do not point commands at private local session, Codex, Hermes, Obsidian, or log directories.
 - Do not commit real workspace paths, personal note content, employer-sensitive text, access tokens, API keys, cookies, or Feishu/OpenPlatform IDs.
 - Keep public fixtures synthetic. Use placeholders such as `<LOCAL_PATH>/scorecard-note.md` for artifact paths.
-- Re-run a privacy scan before committing generated traces, reports, or docs.
+- Re-run `--audit-privacy` before committing generated traces, reports, or docs.

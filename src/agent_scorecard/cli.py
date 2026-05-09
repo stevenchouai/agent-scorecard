@@ -6,7 +6,14 @@ import sys
 from pathlib import Path
 
 from .core import ScoreReport, score_events
-from .hermes_import import HermesImportError, events_to_jsonl, import_hermes_session, write_jsonl
+from .hermes_import import (
+    HermesImportError,
+    PrivacyAuditReport,
+    audit_privacy_jsonl,
+    events_to_jsonl,
+    import_hermes_session,
+    write_jsonl,
+)
 from .report import to_batch_summary_markdown, to_markdown
 
 
@@ -63,11 +70,53 @@ def write_batch_summary(trace_paths: list[Path], output_path: Path) -> Path:
     return output_path
 
 
+def audit_privacy_trace(path: Path, output_format: str) -> tuple[str, bool]:
+    try:
+        report = audit_privacy_jsonl(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise SystemExit(f"Could not read trace {path}: {exc}") from exc
+
+    if output_format == "json":
+        return json.dumps(_privacy_audit_payload(report), ensure_ascii=False, indent=2) + "\n", report.passed
+
+    if report.passed:
+        return (
+            "Privacy audit passed: no obvious secrets, Feishu IDs, or local private paths found.\n",
+            True,
+        )
+
+    lines = [f"Privacy audit failed: {len(report.findings)} finding(s)."]
+    for finding in report.findings[:10]:
+        lines.append(f"- {finding.location}: {finding.rule} ({finding.sample})")
+    if len(report.findings) > 10:
+        lines.append(f"- ... {len(report.findings) - 10} more finding(s)")
+    return "\n".join(lines) + "\n", False
+
+
+def _privacy_audit_payload(report: PrivacyAuditReport) -> dict:
+    return {
+        "passed": report.passed,
+        "findings": [
+            {
+                "rule": finding.rule,
+                "location": finding.location,
+                "line": finding.line,
+                "sample": finding.sample,
+            }
+            for finding in report.findings
+        ],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Score agent workflow traces.")
     parser.add_argument("trace", type=Path, nargs="?", help="Path to one JSONL trace")
     parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
-    parser.add_argument("--output", type=Path, help="Write the scored report, imported trace, or batch summary to this file")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write the scored report, imported trace, batch summary, or privacy audit result to this file",
+    )
     parser.add_argument("--batch-dir", type=Path, help="Score every *.jsonl trace in this directory")
     parser.add_argument("--reports-dir", type=Path, default=Path("examples/reports"), help="Directory for --batch-dir reports")
     parser.add_argument(
@@ -76,7 +125,20 @@ def main(argv: list[str] | None = None) -> int:
         help="With --batch-dir, write a Markdown portfolio summary to --output or reports-dir/index.md",
     )
     parser.add_argument("--from-hermes-session", type=Path, help="Convert one Hermes session JSON file to scorecard JSONL")
+    parser.add_argument("--audit-privacy", type=Path, metavar="TRACE", help="Audit one JSONL trace for obvious sensitive values")
     args = parser.parse_args(argv)
+
+    if args.audit_privacy:
+        if args.trace or args.batch_dir or args.summary or args.from_hermes_session:
+            parser.error("--audit-privacy cannot be combined with trace, --batch-dir, --summary, or --from-hermes-session")
+        rendered, passed = audit_privacy_trace(args.audit_privacy, args.format)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(rendered, encoding="utf-8")
+            print(args.output)
+        else:
+            print(rendered, end="")
+        return 0 if passed else 1
 
     if args.from_hermes_session:
         if args.trace or args.batch_dir:

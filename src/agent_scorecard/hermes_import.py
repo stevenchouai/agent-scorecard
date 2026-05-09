@@ -3,12 +3,30 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 
 class HermesImportError(ValueError):
     """Raised when a Hermes session file cannot be parsed."""
+
+
+@dataclass(frozen=True)
+class PrivacyAuditFinding:
+    rule: str
+    location: str
+    sample: str
+    line: int | None = None
+
+
+@dataclass(frozen=True)
+class PrivacyAuditReport:
+    findings: tuple[PrivacyAuditFinding, ...]
+
+    @property
+    def passed(self) -> bool:
+        return not self.findings
 
 
 TRANSCRIPT_KEYS = ("events", "messages", "items", "turns", "transcript", "conversation")
@@ -51,6 +69,13 @@ QUOTED_POSIX_LOCAL_PATH_RE = re.compile(rf"(?P<quote>[\"'`])(?P<path>{POSIX_LOCA
 POSIX_LOCAL_PATH_RE = re.compile(rf"{POSIX_LOCAL_PATH_PREFIX}[^\s\"'`<>]+")
 QUOTED_WINDOWS_LOCAL_PATH_RE = re.compile(r"(?P<quote>[\"'`])(?P<path>[A-Za-z]:\\Users\\[^\"'`]+)(?P=quote)")
 WINDOWS_LOCAL_PATH_RE = re.compile(r"[A-Za-z]:\\Users\\[^\s\"'`<>]+")
+PRIVACY_AUDIT_PATTERNS: tuple[tuple[str, tuple[re.Pattern[str], ...]], ...] = (
+    ("local_path", (POSIX_LOCAL_PATH_RE, WINDOWS_LOCAL_PATH_RE)),
+    ("secret", (BEARER_RE, SECRET_ASSIGNMENT_RE, CLI_SECRET_OPTION_RE, SECRET_WORD_VALUE_RE, TOKEN_RE)),
+    ("feishu_id", (FEISHU_ID_RE,)),
+)
+SAFE_REDACTION_MARKERS = ("[REDACTED]", "<LOCAL_PATH>")
+MAX_AUDIT_FINDINGS = 50
 
 
 def import_hermes_session(path: Path) -> list[dict[str, Any]]:
@@ -87,6 +112,27 @@ def events_to_jsonl(events: list[dict[str, Any]]) -> str:
 def write_jsonl(events: list[dict[str, Any]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(events_to_jsonl(events), encoding="utf-8")
+
+
+def audit_privacy_jsonl(jsonl_text: str) -> PrivacyAuditReport:
+    findings: list[PrivacyAuditFinding] = []
+    for line_no, line in enumerate(jsonl_text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            findings.extend(_audit_text(line, f"line {line_no}", line_no))
+        else:
+            findings.extend(_audit_value(payload, f"line {line_no}", line_no))
+        if len(findings) >= MAX_AUDIT_FINDINGS:
+            break
+    return PrivacyAuditReport(tuple(findings[:MAX_AUDIT_FINDINGS]))
+
+
+def audit_privacy_events(events: list[Mapping[str, Any]]) -> PrivacyAuditReport:
+    findings = _audit_value(events, "events", None)
+    return PrivacyAuditReport(tuple(findings[:MAX_AUDIT_FINDINGS]))
 
 
 def _find_transcript(payload: Any) -> list[Any]:
@@ -443,6 +489,59 @@ def redact_text(text: str) -> str:
     redacted = TOKEN_RE.sub("[REDACTED]", redacted)
     redacted = FEISHU_ID_RE.sub("[REDACTED]", redacted)
     return redacted
+
+
+def _audit_value(value: Any, location: str, line: int | None) -> list[PrivacyAuditFinding]:
+    if isinstance(value, str):
+        return _audit_text(value, location, line)
+    if isinstance(value, Mapping):
+        findings: list[PrivacyAuditFinding] = []
+        for key, child in value.items():
+            child_location = f"{location}.{key}" if location else str(key)
+            findings.extend(_audit_value(child, child_location, line))
+        return findings
+    if isinstance(value, list):
+        findings = []
+        for index, child in enumerate(value):
+            findings.extend(_audit_value(child, f"{location}[{index}]", line))
+        return findings
+    return []
+
+
+def _audit_text(text: str, location: str, line: int | None) -> list[PrivacyAuditFinding]:
+    findings: list[PrivacyAuditFinding] = []
+    for rule, patterns in PRIVACY_AUDIT_PATTERNS:
+        for pattern in patterns:
+            for match in pattern.finditer(text):
+                raw_match = match.group(0)
+                if _is_safe_redaction(raw_match):
+                    continue
+                sample = _audit_sample(text, match.start(), match.end())
+                findings.append(
+                    PrivacyAuditFinding(
+                        rule=rule,
+                        location=location,
+                        sample=sample,
+                        line=line,
+                    )
+                )
+                if len(findings) >= MAX_AUDIT_FINDINGS:
+                    return findings
+    return findings
+
+
+def _is_safe_redaction(text: str) -> bool:
+    return any(marker in text for marker in SAFE_REDACTION_MARKERS)
+
+
+def _audit_sample(text: str, start: int, end: int) -> str:
+    context_start = max(0, start - 32)
+    context_end = min(len(text), end + 32)
+    sample = redact_text(text[context_start:context_end])
+    sample = " ".join(sample.split())
+    if len(sample) <= 120:
+        return sample
+    return f"{sample[:117]}..."
 
 
 def _redact_quoted_posix_local_path(match: re.Match[str]) -> str:
