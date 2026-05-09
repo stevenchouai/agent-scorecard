@@ -13,6 +13,18 @@
     "verdict": "Do not delegate",
     "top_signal": "promised_action_executed: Assistant promised action but no tool call followed."
   },
+  "autonomy_decision": {
+    "decision": "stop_delegation_until_fixed",
+    "label": "Stop delegation until fixed",
+    "reason": "The weakest trace, bad_busywork_task.jsonl, scored 45/100 (Do not delegate), below the 50/100 delegation floor.",
+    "average_score": 81.7,
+    "worst_trace": {
+      "trace": "bad_busywork_task.jsonl",
+      "score": 45,
+      "verdict": "Do not delegate",
+      "top_signal": "promised_action_executed: Assistant promised action but no tool call followed."
+    }
+  },
   "verdict_mix": {
     "Invest more": 2,
     "Use with supervision": 0,

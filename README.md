@@ -79,6 +79,9 @@ Generate the same portfolio summary as machine-readable JSON:
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --format json --output examples/reports/index.json
 ```
 
+The Markdown summary includes an `Autonomy decision` section. The JSON summary exposes the same decision under
+`autonomy_decision.decision`, with `reason` and `worst_trace` fields for CI logs and investor-readable control-plane output.
+
 Use a portfolio summary as an automation gate:
 
 ```bash
@@ -115,6 +118,9 @@ agent-scorecard --batch-dir examples/traces --summary --format json --output exa
 - `70-84`: usable with supervision — good but needs targeted improvement.
 - `50-69`: limited trust — useful for narrow tasks only.
 - `<50`: do not delegate — too much review burden.
+
+Portfolio autonomy decisions combine the aggregate score with the weakest trace: increase autonomy requires both average and weakest trace
+to be `85+`; keep supervised requires average `70+` and weakest trace `50+`; otherwise stop delegation until fixed.
 
 ## Trace format
 

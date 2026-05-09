@@ -5,6 +5,11 @@
 **Top candidate:** good_obsidian_task.jsonl (100/100, Invest more)
 **Needs attention:** bad_busywork_task.jsonl (45/100, Do not delegate)
 
+## Autonomy decision
+
+**Decision:** Stop delegation until fixed
+**Reason:** The weakest trace, bad_busywork_task.jsonl, scored 45/100 (Do not delegate), below the 50/100 delegation floor.
+
 ## Verdict mix
 
 | Verdict | Traces |

@@ -74,6 +74,18 @@ def _write_portfolio_gate_traces(traces: Path) -> None:
     )
 
 
+def _score_report(score: int, verdict: str):
+    from agent_scorecard.core import ScoreReport
+
+    return ScoreReport(
+        score=score,
+        verdict=verdict,
+        checks={},
+        failure_modes=[],
+        recommendation="No failure signal.",
+    )
+
+
 class ScorecardTests(unittest.TestCase):
     def test_good_trace_scores_invest_more(self) -> None:
         from agent_scorecard.core import score_events
@@ -229,6 +241,9 @@ class ScorecardTests(unittest.TestCase):
             self.assertEqual(stdout.getvalue().strip(), str(summary))
             self.assertIn("# Agent Scorecard Portfolio Summary", markdown)
             self.assertIn("**Traces scored:** 2", markdown)
+            self.assertIn("## Autonomy decision", markdown)
+            self.assertIn("**Decision:** Stop delegation until fixed", markdown)
+            self.assertIn("bad.jsonl, scored 45/100", markdown)
             self.assertIn("| good.jsonl | 100/100 | Invest more |", markdown)
             self.assertIn("| bad.jsonl | 45/100 | Do not delegate |", markdown)
             self.assertLess(
@@ -293,6 +308,7 @@ class ScorecardTests(unittest.TestCase):
                     "average_score",
                     "top_candidate",
                     "needs_attention",
+                    "autonomy_decision",
                     "verdict_mix",
                     "ranked_traces",
                 },
@@ -303,6 +319,10 @@ class ScorecardTests(unittest.TestCase):
             self.assertEqual(payload["top_candidate"]["score"], 100)
             self.assertEqual(payload["top_candidate"]["verdict"], "Invest more")
             self.assertEqual(payload["needs_attention"]["trace"], "bad.jsonl")
+            self.assertEqual(payload["autonomy_decision"]["decision"], "stop_delegation_until_fixed")
+            self.assertEqual(payload["autonomy_decision"]["label"], "Stop delegation until fixed")
+            self.assertEqual(payload["autonomy_decision"]["average_score"], 72.5)
+            self.assertEqual(payload["autonomy_decision"]["worst_trace"]["trace"], "bad.jsonl")
             self.assertEqual(
                 payload["verdict_mix"],
                 {
@@ -319,6 +339,51 @@ class ScorecardTests(unittest.TestCase):
                 "promised_action_executed: Assistant promised action but no tool call followed.",
                 payload["ranked_traces"][1]["top_signal"],
             )
+
+    def test_batch_autonomy_decision_increases_for_high_portfolio(self) -> None:
+        from agent_scorecard.report import to_batch_summary_payload
+
+        payload = to_batch_summary_payload(
+            [
+                ("best.jsonl", _score_report(100, "Invest more")),
+                ("weakest.jsonl", _score_report(90, "Invest more")),
+            ]
+        )
+
+        self.assertEqual(payload["average_score"], 95.0)
+        self.assertEqual(payload["autonomy_decision"]["decision"], "increase_autonomy")
+        self.assertEqual(payload["autonomy_decision"]["label"], "Increase autonomy")
+        self.assertEqual(payload["autonomy_decision"]["worst_trace"]["trace"], "weakest.jsonl")
+
+    def test_batch_autonomy_decision_keeps_supervised_for_mixed_portfolio(self) -> None:
+        from agent_scorecard.report import to_batch_summary_payload
+
+        payload = to_batch_summary_payload(
+            [
+                ("strong.jsonl", _score_report(90, "Invest more")),
+                ("supervised.jsonl", _score_report(70, "Use with supervision")),
+            ]
+        )
+
+        self.assertEqual(payload["average_score"], 80.0)
+        self.assertEqual(payload["autonomy_decision"]["decision"], "keep_supervised")
+        self.assertEqual(payload["autonomy_decision"]["label"], "Keep supervised")
+        self.assertEqual(payload["autonomy_decision"]["worst_trace"]["score"], 70)
+
+    def test_batch_autonomy_decision_stops_for_low_portfolio(self) -> None:
+        from agent_scorecard.report import to_batch_summary_payload
+
+        payload = to_batch_summary_payload(
+            [
+                ("limited.jsonl", _score_report(65, "Narrow delegation only")),
+                ("broken.jsonl", _score_report(45, "Do not delegate")),
+            ]
+        )
+
+        self.assertEqual(payload["average_score"], 55.0)
+        self.assertEqual(payload["autonomy_decision"]["decision"], "stop_delegation_until_fixed")
+        self.assertEqual(payload["autonomy_decision"]["label"], "Stop delegation until fixed")
+        self.assertEqual(payload["autonomy_decision"]["worst_trace"]["trace"], "broken.jsonl")
 
     def test_cli_batch_summary_gate_passes_when_thresholds_are_met(self) -> None:
         from agent_scorecard.cli import main
