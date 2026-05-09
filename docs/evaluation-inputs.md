@@ -14,6 +14,10 @@ A JSONL trace with:
 
 Without tool calls and artifacts, the scorer can only detect obvious bad patterns such as promise-without-action. It cannot prove the agent was good.
 
+## Hermes sessions
+
+Use `docs/hermes-session-import.md` to convert one reviewed, sanitized Hermes session JSON into scorecard JSONL. A committed synthetic example is available at `examples/traces/hermes_session_sanitized.jsonl`, with its rendered report at `examples/reports/hermes_session_sanitized.md`.
+
 ## Best signal for Steven
 
 Use real task traces, especially:

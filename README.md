@@ -47,6 +47,8 @@ Convert a sanitized Hermes session JSON into scorecard JSONL:
 PYTHONPATH=src python -m agent_scorecard.cli --from-hermes-session sanitized-hermes-session.json --output out/hermes-trace.jsonl
 ```
 
+See `docs/hermes-session-import.md` for the public-safe importer runbook and `examples/reports/hermes_session_sanitized.md` for a generated report from the synthetic fixture.
+
 Or install locally first:
 
 ```bash
