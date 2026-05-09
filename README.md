@@ -28,11 +28,37 @@ This is not a generic LLM benchmark. It scores agent work against Steven-specifi
 
 ## Quick start
 
+Install the runnable package with test dependencies:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
 Run one trace and inspect the verdict:
 
 ```bash
+agent-scorecard examples/traces/good_obsidian_task.jsonl
+agent-scorecard examples/traces/bad_busywork_task.jsonl --format markdown
+```
+
+Expected signal from the good trace:
+
+```text
+Score: 100/100
+Verdict: Invest more
+```
+
+Verify the repo locally:
+
+```bash
+pytest
+```
+
+No-install fallback:
+
+```bash
 PYTHONPATH=src python -m agent_scorecard.cli examples/traces/good_obsidian_task.jsonl
-PYTHONPATH=src python -m agent_scorecard.cli examples/traces/bad_busywork_task.jsonl --format markdown
+PYTHONPATH=src python -m unittest discover -v
 ```
 
 Regenerate every public example report in one command:
