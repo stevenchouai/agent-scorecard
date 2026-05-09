@@ -41,6 +41,12 @@ Regenerate every public example report in one command:
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --reports-dir examples/reports
 ```
 
+Generate a portfolio summary across all public example traces:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --reports-dir examples/reports --summary
+```
+
 Convert a sanitized Hermes session JSON into scorecard JSONL:
 
 ```bash
@@ -55,6 +61,7 @@ Or install locally first:
 python -m pip install -e .
 agent-scorecard examples/traces/good_obsidian_task.jsonl
 agent-scorecard --batch-dir examples/traces --reports-dir examples/reports
+agent-scorecard --batch-dir examples/traces --reports-dir examples/reports --summary
 ```
 
 ## Score bands

@@ -125,6 +125,69 @@ class ScorecardTests(unittest.TestCase):
             self.assertTrue((reports / "good.md").exists())
             self.assertTrue((reports / "bad.md").exists())
 
+    def test_cli_batch_summary_generates_portfolio_index(self) -> None:
+        from agent_scorecard.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            traces = tmp_path / "traces"
+            reports = tmp_path / "reports"
+            traces.mkdir()
+            (traces / "good.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event)
+                    for event in [
+                        {"type": "user", "text": "Research this and write a note for Steven's investment decision."},
+                        {"type": "assistant", "text": "I will check sources, write the note, and verify it."},
+                        {"type": "tool_call", "tool": "browser_navigate"},
+                        {"type": "tool_call", "tool": "write_file", "path": "artifact.md"},
+                        {"type": "tool_call", "tool": "read_file", "path": "artifact.md"},
+                        {
+                            "type": "assistant",
+                            "text": (
+                                "Verdict: done. Wrote artifact.md and verified it. "
+                                "This is worth investing in because it creates a durable artifact."
+                            ),
+                        },
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (traces / "bad.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event)
+                    for event in [
+                        {"type": "user", "text": "Look at the market and tell me if this is worth doing."},
+                        {"type": "assistant", "text": "I will research the market and create a plan."},
+                        {"type": "assistant", "text": "This is obviously a good idea. We should do it."},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(main(["--batch-dir", str(traces), "--reports-dir", str(reports), "--summary"]), 0)
+
+            summary = reports / "index.md"
+            markdown = summary.read_text(encoding="utf-8")
+
+            self.assertEqual(stdout.getvalue().strip(), str(summary))
+            self.assertIn("# Agent Scorecard Portfolio Summary", markdown)
+            self.assertIn("**Traces scored:** 2", markdown)
+            self.assertIn("| good.jsonl | 100/100 | Invest more |", markdown)
+            self.assertIn("| bad.jsonl | 45/100 | Do not delegate |", markdown)
+            self.assertLess(
+                markdown.index("| good.jsonl | 100/100 | Invest more |"),
+                markdown.index("| bad.jsonl | 45/100 | Do not delegate |"),
+            )
+            self.assertIn("promised_action_executed: Assistant promised action but no tool call followed.", markdown)
+
+    def test_cli_summary_requires_batch_dir(self) -> None:
+        from agent_scorecard.cli import main
+
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            main(["examples/traces/good_obsidian_task.jsonl", "--summary"])
+
 
 class HermesImportTests(unittest.TestCase):
     def test_fixture_contains_no_private_values(self) -> None:
