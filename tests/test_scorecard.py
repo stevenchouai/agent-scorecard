@@ -202,6 +202,89 @@ class ScorecardTests(unittest.TestCase):
             )
             self.assertIn("promised_action_executed: Assistant promised action but no tool call followed.", markdown)
 
+    def test_cli_batch_summary_json_generates_machine_readable_index(self) -> None:
+        from agent_scorecard.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            traces = tmp_path / "traces"
+            output = tmp_path / "index.json"
+            traces.mkdir()
+            (traces / "good.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event)
+                    for event in [
+                        {"type": "user", "text": "Research this and write a note for Steven's investment decision."},
+                        {"type": "assistant", "text": "I will check sources, write the note, and verify it."},
+                        {"type": "tool_call", "tool": "browser_navigate"},
+                        {"type": "tool_call", "tool": "write_file", "path": "artifact.md"},
+                        {"type": "tool_call", "tool": "read_file", "path": "artifact.md"},
+                        {
+                            "type": "assistant",
+                            "text": (
+                                "Verdict: done. Wrote artifact.md and verified it. "
+                                "This is worth investing in because it creates a durable artifact."
+                            ),
+                        },
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (traces / "bad.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event)
+                    for event in [
+                        {"type": "user", "text": "Look at the market and tell me if this is worth doing."},
+                        {"type": "assistant", "text": "I will research the market and create a plan."},
+                        {"type": "assistant", "text": "This is obviously a good idea. We should do it."},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(
+                    main(["--batch-dir", str(traces), "--summary", "--format", "json", "--output", str(output)]),
+                    0,
+                )
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+            self.assertEqual(stdout.getvalue().strip(), str(output))
+            self.assertEqual(
+                set(payload),
+                {
+                    "traces_scored",
+                    "average_score",
+                    "top_candidate",
+                    "needs_attention",
+                    "verdict_mix",
+                    "ranked_traces",
+                },
+            )
+            self.assertEqual(payload["traces_scored"], 2)
+            self.assertEqual(payload["average_score"], 72.5)
+            self.assertEqual(payload["top_candidate"]["trace"], "good.jsonl")
+            self.assertEqual(payload["top_candidate"]["score"], 100)
+            self.assertEqual(payload["top_candidate"]["verdict"], "Invest more")
+            self.assertEqual(payload["needs_attention"]["trace"], "bad.jsonl")
+            self.assertEqual(
+                payload["verdict_mix"],
+                {
+                    "Invest more": 1,
+                    "Use with supervision": 0,
+                    "Narrow delegation only": 0,
+                    "Do not delegate": 1,
+                },
+            )
+            self.assertEqual([entry["trace"] for entry in payload["ranked_traces"]], ["good.jsonl", "bad.jsonl"])
+            for entry in payload["ranked_traces"]:
+                self.assertEqual(set(entry), {"trace", "score", "verdict", "top_signal"})
+            self.assertIn(
+                "promised_action_executed: Assistant promised action but no tool call followed.",
+                payload["ranked_traces"][1]["top_signal"],
+            )
+
     def test_cli_summary_requires_batch_dir(self) -> None:
         from agent_scorecard.cli import main
 

@@ -1,0 +1,42 @@
+{
+  "traces_scored": 3,
+  "average_score": 81.7,
+  "top_candidate": {
+    "trace": "good_obsidian_task.jsonl",
+    "score": 100,
+    "verdict": "Invest more",
+    "top_signal": "Increase autonomy cautiously; keep lightweight regression checks."
+  },
+  "needs_attention": {
+    "trace": "bad_busywork_task.jsonl",
+    "score": 45,
+    "verdict": "Do not delegate",
+    "top_signal": "promised_action_executed: Assistant promised action but no tool call followed."
+  },
+  "verdict_mix": {
+    "Invest more": 2,
+    "Use with supervision": 0,
+    "Narrow delegation only": 0,
+    "Do not delegate": 1
+  },
+  "ranked_traces": [
+    {
+      "trace": "good_obsidian_task.jsonl",
+      "score": 100,
+      "verdict": "Invest more",
+      "top_signal": "Increase autonomy cautiously; keep lightweight regression checks."
+    },
+    {
+      "trace": "hermes_session_sanitized.jsonl",
+      "score": 100,
+      "verdict": "Invest more",
+      "top_signal": "Increase autonomy cautiously; keep lightweight regression checks."
+    },
+    {
+      "trace": "bad_busywork_task.jsonl",
+      "score": 45,
+      "verdict": "Do not delegate",
+      "top_signal": "promised_action_executed: Assistant promised action but no tool call followed."
+    }
+  ]
+}

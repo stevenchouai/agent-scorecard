@@ -47,6 +47,12 @@ Generate a portfolio summary across all public example traces:
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --reports-dir examples/reports --summary
 ```
 
+Generate the same portfolio summary as machine-readable JSON:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --format json --output examples/reports/index.json
+```
+
 Convert a sanitized Hermes session JSON into scorecard JSONL:
 
 ```bash
@@ -68,6 +74,7 @@ python -m pip install -e .
 agent-scorecard examples/traces/good_obsidian_task.jsonl
 agent-scorecard --batch-dir examples/traces --reports-dir examples/reports
 agent-scorecard --batch-dir examples/traces --reports-dir examples/reports --summary
+agent-scorecard --batch-dir examples/traces --summary --format json --output examples/reports/index.json
 ```
 
 ## Score bands

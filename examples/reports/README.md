@@ -13,3 +13,9 @@ The batch portfolio index is generated with:
 ```bash
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --reports-dir examples/reports --summary
 ```
+
+The machine-readable JSON portfolio index is generated with:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --format json --output examples/reports/index.json
+```

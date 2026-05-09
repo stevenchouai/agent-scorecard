@@ -14,7 +14,7 @@ from .hermes_import import (
     import_hermes_session,
     write_jsonl,
 )
-from .report import to_batch_summary_markdown, to_markdown
+from .report import to_batch_summary_json, to_batch_summary_markdown, to_markdown
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -63,10 +63,11 @@ def write_report(trace_path: Path, output_dir: Path, output_format: str) -> Path
     return output_path
 
 
-def write_batch_summary(trace_paths: list[Path], output_path: Path) -> Path:
+def write_batch_summary(trace_paths: list[Path], output_path: Path, output_format: str) -> Path:
     results = [(trace_path.name, score_trace_report(trace_path)) for trace_path in trace_paths]
+    rendered = to_batch_summary_json(results) if output_format == "json" else to_batch_summary_markdown(results)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(to_batch_summary_markdown(results), encoding="utf-8")
+    output_path.write_text(rendered, encoding="utf-8")
     return output_path
 
 
@@ -122,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--summary",
         action="store_true",
-        help="With --batch-dir, write a Markdown portfolio summary to --output or reports-dir/index.md",
+        help="With --batch-dir, write a portfolio summary to --output or reports-dir/index.md/json",
     )
     parser.add_argument("--from-hermes-session", type=Path, help="Convert one Hermes session JSON file to scorecard JSONL")
     parser.add_argument("--audit-privacy", type=Path, metavar="TRACE", help="Audit one JSONL trace for obvious sensitive values")
@@ -158,14 +159,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--summary requires --batch-dir")
 
     if args.batch_dir:
-        if args.summary and args.format != "markdown":
-            parser.error("--summary only supports markdown output")
         traces = sorted(args.batch_dir.glob("*.jsonl"))
         if not traces:
             raise SystemExit(f"No *.jsonl traces found in {args.batch_dir}")
         if args.summary:
-            summary_path = args.output or (args.reports_dir / "index.md")
-            print(write_batch_summary(traces, summary_path))
+            suffix = ".json" if args.format == "json" else ".md"
+            summary_path = args.output or (args.reports_dir / f"index{suffix}")
+            print(write_batch_summary(traces, summary_path, args.format))
             return 0
         written = [write_report(trace, args.reports_dir, args.format) for trace in traces]
         for path in written:
