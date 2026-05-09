@@ -41,6 +41,12 @@ Regenerate every public example report in one command:
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --reports-dir examples/reports
 ```
 
+Convert a sanitized Hermes session JSON into scorecard JSONL:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli --from-hermes-session sanitized-hermes-session.json --output out/hermes-trace.jsonl
+```
+
 Or install locally first:
 
 ```bash

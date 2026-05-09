@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .core import score_events
+from .hermes_import import HermesImportError, events_to_jsonl, import_hermes_session, write_jsonl
 from .report import to_markdown
 
 
@@ -55,10 +56,25 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Score agent workflow traces.")
     parser.add_argument("trace", type=Path, nargs="?", help="Path to one JSONL trace")
     parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
-    parser.add_argument("--output", type=Path, help="Write the scored report to this file instead of stdout")
+    parser.add_argument("--output", type=Path, help="Write the scored report or imported trace to this file instead of stdout")
     parser.add_argument("--batch-dir", type=Path, help="Score every *.jsonl trace in this directory")
     parser.add_argument("--reports-dir", type=Path, default=Path("examples/reports"), help="Directory for --batch-dir reports")
+    parser.add_argument("--from-hermes-session", type=Path, help="Convert one Hermes session JSON file to scorecard JSONL")
     args = parser.parse_args(argv)
+
+    if args.from_hermes_session:
+        if args.trace or args.batch_dir:
+            parser.error("--from-hermes-session cannot be combined with trace or --batch-dir")
+        try:
+            events = import_hermes_session(args.from_hermes_session)
+        except HermesImportError as exc:
+            raise SystemExit(str(exc)) from exc
+        if args.output:
+            write_jsonl(events, args.output)
+            print(args.output)
+        else:
+            print(events_to_jsonl(events), end="")
+        return 0
 
     if args.batch_dir:
         traces = sorted(args.batch_dir.glob("*.jsonl"))
