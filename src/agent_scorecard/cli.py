@@ -63,12 +63,62 @@ def write_report(trace_path: Path, output_dir: Path, output_format: str) -> Path
     return output_path
 
 
-def write_batch_summary(trace_paths: list[Path], output_path: Path, output_format: str) -> Path:
+def score_batch_reports(trace_paths: list[Path]) -> list[tuple[str, ScoreReport]]:
     results = [(trace_path.name, score_trace_report(trace_path)) for trace_path in trace_paths]
+    return results
+
+
+def write_batch_summary_results(results: list[tuple[str, ScoreReport]], output_path: Path, output_format: str) -> Path:
     rendered = to_batch_summary_json(results) if output_format == "json" else to_batch_summary_markdown(results)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(rendered, encoding="utf-8")
     return output_path
+
+
+def write_batch_summary(trace_paths: list[Path], output_path: Path, output_format: str) -> Path:
+    return write_batch_summary_results(score_batch_reports(trace_paths), output_path, output_format)
+
+
+def evaluate_summary_gates(
+    results: list[tuple[str, ScoreReport]],
+    fail_under_average: float | None,
+    fail_under_min: float | None,
+) -> list[str]:
+    failures: list[str] = []
+    if not results:
+        return failures
+
+    if fail_under_average is not None:
+        average = round(sum(report.score for _, report in results) / len(results), 1)
+        if average < fail_under_average:
+            failures.append(
+                f"--fail-under-average {_format_threshold(fail_under_average)} missed: "
+                f"average score {average:.1f}/100"
+            )
+
+    if fail_under_min is not None:
+        lowest_name, lowest_report = min(results, key=lambda item: (item[1].score, item[0]))
+        if lowest_report.score < fail_under_min:
+            failures.append(
+                f"--fail-under-min {_format_threshold(fail_under_min)} missed: "
+                f"lowest trace {lowest_name} scored {lowest_report.score}/100"
+            )
+
+    return failures
+
+
+def _score_threshold(value: str) -> float:
+    try:
+        threshold = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number between 0 and 100") from exc
+    if not 0 <= threshold <= 100:
+        raise argparse.ArgumentTypeError("must be between 0 and 100")
+    return threshold
+
+
+def _format_threshold(value: float) -> str:
+    return f"{value:g}"
 
 
 def audit_privacy_trace(path: Path, output_format: str) -> tuple[str, bool]:
@@ -125,9 +175,25 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="With --batch-dir, write a portfolio summary to --output or reports-dir/index.md/json",
     )
+    parser.add_argument(
+        "--fail-under-average",
+        type=_score_threshold,
+        metavar="N",
+        help="With --batch-dir --summary, exit non-zero if the average score is below N",
+    )
+    parser.add_argument(
+        "--fail-under-min",
+        type=_score_threshold,
+        metavar="N",
+        help="With --batch-dir --summary, exit non-zero if any trace score is below N",
+    )
     parser.add_argument("--from-hermes-session", type=Path, help="Convert one Hermes session JSON file to scorecard JSONL")
     parser.add_argument("--audit-privacy", type=Path, metavar="TRACE", help="Audit one JSONL trace for obvious sensitive values")
     args = parser.parse_args(argv)
+
+    gate_requested = args.fail_under_average is not None or args.fail_under_min is not None
+    if gate_requested and not (args.batch_dir and args.summary):
+        parser.error("--fail-under-average and --fail-under-min require --batch-dir --summary")
 
     if args.audit_privacy:
         if args.trace or args.batch_dir or args.summary or args.from_hermes_session:
@@ -165,7 +231,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.summary:
             suffix = ".json" if args.format == "json" else ".md"
             summary_path = args.output or (args.reports_dir / f"index{suffix}")
-            print(write_batch_summary(traces, summary_path, args.format))
+            results = score_batch_reports(traces)
+            print(write_batch_summary_results(results, summary_path, args.format))
+            gate_failures = evaluate_summary_gates(results, args.fail_under_average, args.fail_under_min)
+            if gate_failures:
+                print(f"Portfolio gate failed: {'; '.join(gate_failures)}.", file=sys.stderr)
+                return 1
             return 0
         written = [write_report(trace, args.reports_dir, args.format) for trace in traces]
         for path in written:

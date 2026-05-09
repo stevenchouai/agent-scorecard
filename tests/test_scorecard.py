@@ -39,6 +39,41 @@ def _synthetic_leaked_trace_jsonl() -> tuple[str, dict[str, str]]:
     }
 
 
+def _write_portfolio_gate_traces(traces: Path) -> None:
+    traces.mkdir()
+    (traces / "good.jsonl").write_text(
+        "\n".join(
+            json.dumps(event)
+            for event in [
+                {"type": "user", "text": "Research this and write a note for Steven's investment decision."},
+                {"type": "assistant", "text": "I will check sources, write the note, and verify it."},
+                {"type": "tool_call", "tool": "browser_navigate"},
+                {"type": "tool_call", "tool": "write_file", "path": "artifact.md"},
+                {"type": "tool_call", "tool": "read_file", "path": "artifact.md"},
+                {
+                    "type": "assistant",
+                    "text": (
+                        "Verdict: done. Wrote artifact.md and verified it. "
+                        "This is worth investing in because it creates a durable artifact."
+                    ),
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (traces / "bad.jsonl").write_text(
+        "\n".join(
+            json.dumps(event)
+            for event in [
+                {"type": "user", "text": "Look at the market and tell me if this is worth doing."},
+                {"type": "assistant", "text": "I will research the market and create a plan."},
+                {"type": "assistant", "text": "This is obviously a good idea. We should do it."},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 class ScorecardTests(unittest.TestCase):
     def test_good_trace_scores_invest_more(self) -> None:
         from agent_scorecard.core import score_events
@@ -284,6 +319,83 @@ class ScorecardTests(unittest.TestCase):
                 "promised_action_executed: Assistant promised action but no tool call followed.",
                 payload["ranked_traces"][1]["top_signal"],
             )
+
+    def test_cli_batch_summary_gate_passes_when_thresholds_are_met(self) -> None:
+        from agent_scorecard.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            traces = tmp_path / "traces"
+            reports = tmp_path / "reports"
+            _write_portfolio_gate_traces(traces)
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.redirect_stderr(
+                io.StringIO()
+            ) as stderr:
+                exit_code = main(
+                    [
+                        "--batch-dir",
+                        str(traces),
+                        "--reports-dir",
+                        str(reports),
+                        "--summary",
+                        "--fail-under-average",
+                        "70",
+                        "--fail-under-min",
+                        "40",
+                    ]
+                )
+
+            summary = reports / "index.md"
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stdout.getvalue().strip(), str(summary))
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertTrue(summary.exists())
+
+    def test_cli_batch_summary_gate_fails_after_writing_summary(self) -> None:
+        from agent_scorecard.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            traces = tmp_path / "traces"
+            reports = tmp_path / "reports"
+            _write_portfolio_gate_traces(traces)
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.redirect_stderr(
+                io.StringIO()
+            ) as stderr:
+                exit_code = main(
+                    [
+                        "--batch-dir",
+                        str(traces),
+                        "--reports-dir",
+                        str(reports),
+                        "--summary",
+                        "--fail-under-average",
+                        "80",
+                        "--fail-under-min",
+                        "50",
+                    ]
+                )
+
+            summary = reports / "index.md"
+            error = stderr.getvalue()
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue().strip(), str(summary))
+            self.assertTrue(summary.exists())
+            self.assertIn("Portfolio gate failed", error)
+            self.assertIn("--fail-under-average 80 missed", error)
+            self.assertIn("average score 72.5/100", error)
+            self.assertIn("--fail-under-min 50 missed", error)
+            self.assertIn("lowest trace bad.jsonl scored 45/100", error)
+
+    def test_cli_batch_summary_gate_rejects_out_of_range_threshold(self) -> None:
+        from agent_scorecard.cli import main
+
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, self.assertRaises(SystemExit):
+            main(["--batch-dir", "examples/traces", "--summary", "--fail-under-average", "101"])
+
+        self.assertIn("must be between 0 and 100", stderr.getvalue())
 
     def test_cli_summary_requires_batch_dir(self) -> None:
         from agent_scorecard.cli import main

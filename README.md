@@ -79,6 +79,12 @@ Generate the same portfolio summary as machine-readable JSON:
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --format json --output examples/reports/index.json
 ```
 
+Use a portfolio summary as an automation gate:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --fail-under-average 70 --fail-under-min 40
+```
+
 Convert a sanitized Hermes session JSON into scorecard JSONL:
 
 ```bash
