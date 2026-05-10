@@ -82,6 +82,10 @@ PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summa
 The Markdown summary includes an `Autonomy decision` section. The JSON summary exposes the same decision under
 `autonomy_decision.decision`, with `reason` and `worst_trace` fields for CI logs and investor-readable control-plane output.
 
+Open the static proof surface in a browser:
+
+[examples/reports/portfolio-viewer.html](examples/reports/portfolio-viewer.html)
+
 Use a portfolio summary as an automation gate:
 
 ```bash
