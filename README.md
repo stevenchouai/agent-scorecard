@@ -84,7 +84,15 @@ The Markdown summary includes an `Autonomy decision` section. The JSON summary e
 
 Open the static proof surface in a browser:
 
+[![Agent Scorecard portfolio badge](examples/reports/portfolio-badge.svg)](examples/reports/portfolio-viewer.html)
+
 [examples/reports/portfolio-viewer.html](examples/reports/portfolio-viewer.html)
+
+Generate the compact SVG badge from the same public summary data:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --format badge --output examples/reports/portfolio-badge.svg
+```
 
 Use a portfolio summary as an automation gate:
 

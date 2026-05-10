@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="32" viewBox="0 0 560 32" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Scorecard portfolio badge</title>
+  <desc id="desc">Average score 81.7/100; decision Stop delegation until fixed.</desc>
+  <rect width="560" height="32" rx="6" fill="#14201b"/>
+  <rect x="170" width="112" height="32" fill="#f6f1df"/>
+  <rect x="282" width="278" height="32" rx="6" fill="#b42318"/>
+  <rect x="282" width="8" height="32" fill="#b42318"/>
+  <text x="16" y="21" fill="#ffffff" font-family="Avenir Next, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="700">agent scorecard</text>
+  <text x="186" y="21" fill="#14201b" font-family="Avenir Next, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800">81.7/100</text>
+  <text x="302" y="21" fill="#ffffff" font-family="Avenir Next, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800">Stop delegation until fixed</text>
+</svg>

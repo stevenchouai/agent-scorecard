@@ -340,6 +340,51 @@ class ScorecardTests(unittest.TestCase):
                 payload["ranked_traces"][1]["top_signal"],
             )
 
+    def test_cli_batch_summary_badge_generates_svg(self) -> None:
+        from agent_scorecard.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            traces = tmp_path / "traces"
+            output = tmp_path / "portfolio-badge.svg"
+            _write_portfolio_gate_traces(traces)
+
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(
+                    main(["--batch-dir", str(traces), "--summary", "--format", "badge", "--output", str(output)]),
+                    0,
+                )
+
+            svg = output.read_text(encoding="utf-8")
+
+            self.assertEqual(stdout.getvalue().strip(), str(output))
+            self.assertTrue(svg.startswith('<svg xmlns="http://www.w3.org/2000/svg"'))
+            self.assertIn("72.5/100", svg)
+            self.assertIn("Stop delegation until fixed", svg)
+            self.assertIn('fill="#b42318"', svg)
+            self.assertNotIn("<script", svg.lower())
+            self.assertNotIn("href=", svg.lower())
+            self.assertNotIn("url(", svg.lower())
+
+    def test_portfolio_badge_escapes_dynamic_text_and_falls_back_on_bad_score(self) -> None:
+        from agent_scorecard.report import to_portfolio_badge_svg
+
+        svg = to_portfolio_badge_svg(
+            {
+                "average_score": "not-a-number",
+                "autonomy_decision": {
+                    "decision": "unknown",
+                    "label": "Hold <review> & verify",
+                    "average_score": "not-a-number",
+                },
+            }
+        )
+
+        self.assertIn("0.0/100", svg)
+        self.assertIn("Hold &lt;review&gt; &amp; verify", svg)
+        self.assertIn('fill="#53645c"', svg)
+        self.assertNotIn("Hold <review>", svg)
+
     def test_batch_autonomy_decision_increases_for_high_portfolio(self) -> None:
         from agent_scorecard.report import to_batch_summary_payload
 

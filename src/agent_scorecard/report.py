@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from xml.sax.saxutils import escape
 
 from .core import ScoreReport
 
@@ -11,6 +12,13 @@ VERDICT_ORDER = (
     "Narrow delegation only",
     "Do not delegate",
 )
+
+BADGE_DECISION_COLORS = {
+    "increase_autonomy": "#17624e",
+    "keep_supervised": "#8a5a00",
+    "stop_delegation_until_fixed": "#b42318",
+    "insufficient_data": "#53645c",
+}
 
 
 def to_markdown(report: ScoreReport) -> str:
@@ -98,6 +106,43 @@ def to_batch_summary_json(results: list[tuple[str, ScoreReport]]) -> str:
     return json.dumps(to_batch_summary_payload(results), ensure_ascii=False, indent=2) + "\n"
 
 
+def to_batch_summary_badge_svg(results: list[tuple[str, ScoreReport]]) -> str:
+    return to_portfolio_badge_svg(to_batch_summary_payload(results))
+
+
+def to_portfolio_badge_svg(payload: dict[str, Any]) -> str:
+    decision = payload.get("autonomy_decision") or {}
+    decision_key = str(decision.get("decision") or "insufficient_data")
+    decision_label = str(decision.get("label") or "Insufficient data")
+    average_score = _format_badge_score(decision.get("average_score", payload.get("average_score", 0.0)))
+    decision_color = BADGE_DECISION_COLORS.get(decision_key, BADGE_DECISION_COLORS["insufficient_data"])
+
+    escaped_score = escape(f"{average_score}/100")
+    escaped_label = escape(decision_label)
+    description = escape(f"Average score {average_score}/100; decision {decision_label}.")
+
+    return "\n".join(
+        [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="560" height="32" viewBox="0 0 560 32" '
+            'role="img" aria-labelledby="title desc">',
+            '  <title id="title">Agent Scorecard portfolio badge</title>',
+            f'  <desc id="desc">{description}</desc>',
+            '  <rect width="560" height="32" rx="6" fill="#14201b"/>',
+            '  <rect x="170" width="112" height="32" fill="#f6f1df"/>',
+            f'  <rect x="282" width="278" height="32" rx="6" fill="{decision_color}"/>',
+            f'  <rect x="282" width="8" height="32" fill="{decision_color}"/>',
+            '  <text x="16" y="21" fill="#ffffff" font-family="Avenir Next, Segoe UI, Helvetica, Arial, sans-serif" '
+            'font-size="13" font-weight="700">agent scorecard</text>',
+            f'  <text x="186" y="21" fill="#14201b" font-family="Avenir Next, Segoe UI, Helvetica, Arial, sans-serif" '
+            f'font-size="13" font-weight="800">{escaped_score}</text>',
+            f'  <text x="302" y="21" fill="#ffffff" font-family="Avenir Next, Segoe UI, Helvetica, Arial, sans-serif" '
+            f'font-size="13" font-weight="800">{escaped_label}</text>',
+            "</svg>",
+            "",
+        ]
+    )
+
+
 def to_batch_summary_payload(results: list[tuple[str, ScoreReport]]) -> dict[str, Any]:
     ranked = _ranked_results(results)
     ranked_traces = [_trace_summary(name, report) for name, report in ranked]
@@ -182,6 +227,13 @@ def _ranked_results(results: list[tuple[str, ScoreReport]]) -> list[tuple[str, S
 
 def _average_score(results: list[tuple[str, ScoreReport]]) -> float:
     return round(sum(report.score for _, report in results) / len(results), 1) if results else 0.0
+
+
+def _format_badge_score(value: Any) -> str:
+    try:
+        return f"{float(value):.1f}"
+    except (TypeError, ValueError):
+        return "0.0"
 
 
 def _verdict_mix(results: list[tuple[str, ScoreReport]]) -> dict[str, int]:

@@ -14,7 +14,7 @@ from .hermes_import import (
     import_hermes_session,
     write_jsonl,
 )
-from .report import to_batch_summary_json, to_batch_summary_markdown, to_markdown
+from .report import to_batch_summary_badge_svg, to_batch_summary_json, to_batch_summary_markdown, to_markdown
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -69,7 +69,7 @@ def score_batch_reports(trace_paths: list[Path]) -> list[tuple[str, ScoreReport]
 
 
 def write_batch_summary_results(results: list[tuple[str, ScoreReport]], output_path: Path, output_format: str) -> Path:
-    rendered = to_batch_summary_json(results) if output_format == "json" else to_batch_summary_markdown(results)
+    rendered = _render_batch_summary_results(results, output_format)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(rendered, encoding="utf-8")
     return output_path
@@ -77,6 +77,22 @@ def write_batch_summary_results(results: list[tuple[str, ScoreReport]], output_p
 
 def write_batch_summary(trace_paths: list[Path], output_path: Path, output_format: str) -> Path:
     return write_batch_summary_results(score_batch_reports(trace_paths), output_path, output_format)
+
+
+def _render_batch_summary_results(results: list[tuple[str, ScoreReport]], output_format: str) -> str:
+    if output_format == "json":
+        return to_batch_summary_json(results)
+    if output_format == "badge":
+        return to_batch_summary_badge_svg(results)
+    return to_batch_summary_markdown(results)
+
+
+def _summary_suffix(output_format: str) -> str:
+    if output_format == "json":
+        return ".json"
+    if output_format == "badge":
+        return ".svg"
+    return ".md"
 
 
 def evaluate_summary_gates(
@@ -162,7 +178,7 @@ def _privacy_audit_payload(report: PrivacyAuditReport) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Score agent workflow traces.")
     parser.add_argument("trace", type=Path, nargs="?", help="Path to one JSONL trace")
-    parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
+    parser.add_argument("--format", choices=["markdown", "json", "badge"], default="markdown")
     parser.add_argument(
         "--output",
         type=Path,
@@ -194,6 +210,8 @@ def main(argv: list[str] | None = None) -> int:
     gate_requested = args.fail_under_average is not None or args.fail_under_min is not None
     if gate_requested and not (args.batch_dir and args.summary):
         parser.error("--fail-under-average and --fail-under-min require --batch-dir --summary")
+    if args.format == "badge" and not (args.batch_dir and args.summary):
+        parser.error("--format badge requires --batch-dir --summary")
 
     if args.audit_privacy:
         if args.trace or args.batch_dir or args.summary or args.from_hermes_session:
@@ -229,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         if not traces:
             raise SystemExit(f"No *.jsonl traces found in {args.batch_dir}")
         if args.summary:
-            suffix = ".json" if args.format == "json" else ".md"
+            suffix = _summary_suffix(args.format)
             summary_path = args.output or (args.reports_dir / f"index{suffix}")
             results = score_batch_reports(traces)
             print(write_batch_summary_results(results, summary_path, args.format))
