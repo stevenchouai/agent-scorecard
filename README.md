@@ -100,6 +100,18 @@ Use a portfolio summary as an automation gate:
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --fail-under-average 70 --fail-under-min 40
 ```
 
+## Public proof gate
+
+This repo ships a GitHub Actions proof gate at `.github/workflows/scorecard.yml`. On every pull request and `main` push it:
+
+1. runs the unit test suite;
+2. audits every public example trace for obvious secrets, Feishu IDs, and local private paths;
+3. regenerates the public Markdown/JSON/SVG proof reports;
+4. enforces portfolio score floors with `--fail-under-average 70 --fail-under-min 40`; and
+5. fails if regenerated public reports differ from the committed `examples/reports` artifacts.
+
+That makes the public examples usable as a small CI-backed proof chain: if a future trace lowers quality, leaks private context, or leaves the published evidence stale, the workflow turns red before the evidence is published.
+
 Convert a sanitized Hermes session JSON into scorecard JSONL:
 
 ```bash
