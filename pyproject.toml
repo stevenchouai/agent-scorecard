@@ -9,6 +9,11 @@ authors = [{name = "Steven Chou"}]
 
 dependencies = []
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]
+
 [project.scripts]
 agent-scorecard = "agent_scorecard.cli:main"
 

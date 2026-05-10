@@ -1,0 +1,54 @@
+name: Agent Scorecard proof gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof-gate:
+    name: Public proof-chain quality gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run unit tests
+        run: python -m unittest discover -v
+
+      - name: Audit public traces for privacy leaks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for trace in examples/traces/*.jsonl; do
+            agent-scorecard --audit-privacy "$trace"
+          done
+
+      - name: Regenerate public proof reports
+        run: agent-scorecard --batch-dir examples/traces --reports-dir examples/reports
+
+      - name: Regenerate public portfolio JSON
+        run: agent-scorecard --batch-dir examples/traces --summary --format json --output examples/reports/index.json
+
+      - name: Regenerate public portfolio badge
+        run: agent-scorecard --batch-dir examples/traces --summary --format badge --output examples/reports/portfolio-badge.svg
+
+      - name: Enforce portfolio quality thresholds
+        run: agent-scorecard --batch-dir examples/traces --summary --fail-under-average 70 --fail-under-min 40
+
+      - name: Verify public proof reports are committed
+        run: git diff --exit-code -- examples/reports

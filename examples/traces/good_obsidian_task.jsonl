@@ -1,4 +1,4 @@
-{"type":"user","text":"Research agent eval tools and write a concise note to Obsidian. Make clear why this is worth Steven's token investment."}
+{"type":"user","text":"Research agent eval tools and write a concise note to Obsidian. Make clear why this is worth Steven's attention investment."}
 {"type":"assistant","text":"I will check sources, write the note, and verify it."}
 {"type":"tool_call","tool":"browser_navigate","path":"https://docs.smith.langchain.com/evaluation"}
 {"type":"tool_call","tool":"browser_navigate","path":"https://www.braintrust.dev/docs/evaluate"}

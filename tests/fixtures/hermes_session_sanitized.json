@@ -1,0 +1,44 @@
+{
+  "session": {
+    "id": "synthetic-hermes-session",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Research scorecard inputs and write a concise note for Steven."
+      },
+      {
+        "role": "assistant",
+        "content": "I will inspect docs, write the note, and verify it."
+      },
+      {
+        "type": "tool_call",
+        "tool": "read_file",
+        "path": "docs/evaluation-inputs.md"
+      },
+      {
+        "type": "tool_call",
+        "tool": "write_file",
+        "path": "<LOCAL_PATH>/scorecard-note.md"
+      },
+      {
+        "type": "tool_result",
+        "tool": "write_file",
+        "ok": true,
+        "content": "Wrote <LOCAL_PATH>/scorecard-note.md"
+      },
+      {
+        "type": "tool_call",
+        "tool": "read_file",
+        "path": "<LOCAL_PATH>/scorecard-note.md"
+      },
+      {
+        "type": "artifact",
+        "path": "<LOCAL_PATH>/scorecard-note.md"
+      },
+      {
+        "role": "assistant",
+        "content": "Verdict: done. Wrote <LOCAL_PATH>/scorecard-note.md and verified it for Steven. This is worth investing in because it creates a durable artifact and avoids busywork."
+      }
+    ]
+  }
+}
