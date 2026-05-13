@@ -92,6 +92,77 @@ class StaticViewerTests(unittest.TestCase):
         self.assertIn("trace-walkthrough.html", reports_readme)
         self.assertIn('href="trace-walkthrough.html"', portfolio_html)
 
+    def test_failure_replay_page_is_static_public_and_actionable(self) -> None:
+        html_path = REPORTS_DIR / "failure-replay.html"
+        self.assertTrue(html_path.exists())
+
+        html = html_path.read_text(encoding="utf-8")
+        root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        reports_readme = (REPORTS_DIR / "README.md").read_text(encoding="utf-8")
+        self.assertIn("<!doctype html>", html.lower())
+        self.assertIn("Agent Scorecard failure replay", html)
+        self.assertIn("A bad trace changes the next autonomy decision.", html)
+
+        for label in (
+            "Good delegated run",
+            "Bad busywork run",
+            "good_obsidian_task.jsonl, 100/100, Invest more",
+            "bad_busywork_task.jsonl, 45/100, Do not delegate",
+            "artifacts/agent-eval-market.md",
+            "promised_action_executed: Assistant promised action but no tool call followed.",
+            "uses_tools_for_retrieval: Research/file/system claims had no retrieval tool evidence.",
+            "durable_artifact: No durable artifact detected.",
+            "Stop delegation until fixed",
+            "Do not increase permissions for this task pattern.",
+        ):
+            self.assertIn(label, html)
+
+        for dimension in (
+            "Artifacts",
+            "Verification",
+            "Privacy",
+            "Handoff quality",
+            "Autonomy decision",
+        ):
+            self.assertIn(dimension, html)
+
+        for report_name in (
+            "trace-walkthrough.html",
+            "delegation-policy.html",
+            "portfolio-viewer.html",
+            "index.json",
+        ):
+            self.assertIn(f'href="{report_name}"', html)
+
+        self.assertIn("examples/reports/failure-replay.html", root_readme)
+        self.assertIn("failure-replay.html", reports_readme)
+
+        lower_html = html.lower()
+        self.assertNotIn("<script", lower_html)
+        self.assertNotIn("javascript:", lower_html)
+        self.assertNotIn("@import", lower_html)
+        self.assertNotIn("url(", lower_html)
+
+        for forbidden in (
+            "http://",
+            "https://",
+            "file://",
+            "/Users/",
+            "/private/",
+            "/vault/",
+            "Steven",
+            "stevenchou",
+            "api_key",
+            "access_token",
+            "refresh_token",
+            "Authorization:",
+            "<script src",
+            "<link rel=\"stylesheet\"",
+        ):
+            self.assertNotIn(forbidden, html)
+
+        self.assertNotRegex(html, r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
+
     def test_portfolio_badge_matches_public_summary_payload(self) -> None:
         from agent_scorecard.report import to_portfolio_badge_svg
 

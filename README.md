@@ -96,6 +96,10 @@ Use the delegation policy simulator to translate those scores into a next-step a
 
 [examples/reports/delegation-policy.html](examples/reports/delegation-policy.html)
 
+See a failure replay that contrasts a good delegated run with a bad busywork run, then shows how the failed trace changes the next autonomy decision:
+
+[examples/reports/failure-replay.html](examples/reports/failure-replay.html)
+
 Generate the compact SVG badge from the same public summary data:
 
 ```bash

@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Scorecard Failure Replay</title>
+  <style>
+    :root {
+      --ink: #141b18;
+      --muted: #52605a;
+      --paper: #f6f5ee;
+      --panel: #ffffff;
+      --line: #d5dcd5;
+      --green: #12634d;
+      --green-soft: #e5f0eb;
+      --red: #b42318;
+      --red-soft: #fae7e4;
+      --amber: #8a5a00;
+      --amber-soft: #f5ecd6;
+      --blue: #245d8f;
+      --blue-soft: #e4eef7;
+      --charcoal: #202823;
+      --code: #111815;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(36, 93, 143, 0.07) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(18, 99, 77, 0.06) 1px, transparent 1px),
+        var(--paper);
+      background-size: 44px 44px;
+      color: var(--ink);
+      font-family: Avenir Next, Segoe UI, Helvetica Neue, sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 20px 58px;
+    }
+
+    a {
+      color: var(--blue);
+      font-weight: 800;
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.16em;
+    }
+
+    h1,
+    h2,
+    h3,
+    p,
+    pre {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 880px;
+      margin-bottom: 16px;
+      font-family: Georgia, Cambria, Times New Roman, serif;
+      font-size: 50px;
+      font-weight: 700;
+      line-height: 1.06;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-size: 23px;
+      line-height: 1.2;
+    }
+
+    h3 {
+      margin-bottom: 8px;
+      font-size: 17px;
+      line-height: 1.2;
+    }
+
+    .eyebrow {
+      margin-bottom: 10px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .lede {
+      max-width: 850px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .hero {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 28px;
+    }
+
+    .hero-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .impact-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .impact-card,
+    .case-card,
+    .section,
+    .decision-panel,
+    .proof-note {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .impact-card {
+      min-height: 145px;
+      padding: 18px;
+    }
+
+    .impact-card.good {
+      border-top: 5px solid var(--green);
+    }
+
+    .impact-card.bad {
+      border-top: 5px solid var(--red);
+    }
+
+    .impact-card.decision {
+      border-top: 5px solid var(--amber);
+    }
+
+    .impact-label {
+      display: block;
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .impact-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-family: Georgia, Cambria, Times New Roman, serif;
+      font-size: 29px;
+      line-height: 1;
+    }
+
+    .impact-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .section {
+      margin-top: 24px;
+      padding: 24px;
+    }
+
+    .section-intro {
+      max-width: 830px;
+      color: var(--muted);
+    }
+
+    .case-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .case-card {
+      overflow: hidden;
+    }
+
+    .case-card.good {
+      border-color: #9fcabc;
+    }
+
+    .case-card.bad {
+      border-color: #efb6ae;
+    }
+
+    .case-heading {
+      padding: 18px 18px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .case-heading.good {
+      background: var(--green-soft);
+    }
+
+    .case-heading.bad {
+      background: var(--red-soft);
+    }
+
+    .case-kicker {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .score-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .score-pill.good {
+      background: #ffffff;
+      color: var(--green);
+    }
+
+    .score-pill.bad {
+      background: #ffffff;
+      color: var(--red);
+    }
+
+    .case-body {
+      padding: 18px;
+    }
+
+    .replay-list {
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .replay-list li {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+    }
+
+    .replay-list li:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .replay-label {
+      color: var(--charcoal);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .replay-list p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .evidence-table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 12px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code,
+    pre {
+      font-family: Menlo, Consolas, Monaco, monospace;
+    }
+
+    code {
+      font-size: 0.94em;
+    }
+
+    pre {
+      overflow-x: auto;
+      border-radius: 7px;
+      background: var(--code);
+      color: #edf7f1;
+      padding: 13px;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .pass {
+      color: var(--green);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .fail {
+      color: var(--red);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .decision-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 18px;
+      margin-top: 20px;
+      padding: 20px;
+      border-left: 6px solid var(--red);
+    }
+
+    .decision-panel strong {
+      display: block;
+      margin-bottom: 10px;
+      font-family: Georgia, Cambria, Times New Roman, serif;
+      font-size: 32px;
+      line-height: 1.05;
+      color: var(--red);
+    }
+
+    .decision-panel p {
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .action-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .action-list li + li {
+      margin-top: 7px;
+    }
+
+    .proof-links {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .proof-links li {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfa;
+      padding: 14px;
+    }
+
+    .proof-links span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .proof-note {
+      margin-top: 24px;
+      padding: 16px 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .proof-note p {
+      margin-bottom: 8px;
+    }
+
+    .proof-note p:last-child {
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        padding: 30px 14px 42px;
+      }
+
+      h1 {
+        font-size: 37px;
+      }
+
+      .impact-strip,
+      .case-grid,
+      .decision-panel,
+      .proof-links {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        overflow-x: auto;
+        padding: 18px;
+      }
+
+      .replay-list li {
+        grid-template-columns: 1fr;
+        gap: 5px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Agent Scorecard failure replay</p>
+      <h1>A bad trace changes the next autonomy decision.</h1>
+      <p class="lede">
+        This public-safe replay contrasts two synthetic cases from the committed examples:
+        one delegated run with evidence, and one busywork run that sounded confident but did not act.
+        The point is not just scoring. The failed trace blocks broader autonomy until the behavior is fixed.
+      </p>
+      <nav class="hero-links" aria-label="Related public proof">
+        <a href="trace-walkthrough.html">Trace walkthrough</a>
+        <a href="delegation-policy.html">Delegation policy</a>
+        <a href="portfolio-viewer.html">Portfolio viewer</a>
+        <a href="index.json">Summary JSON</a>
+      </nav>
+
+      <div class="impact-strip" aria-label="Replay outcome">
+        <section class="impact-card good">
+          <span class="impact-label">Good delegated run</span>
+          <strong>100/100</strong>
+          <p>Tools used, artifact written, verification performed, and final handoff tied to the value of delegation.</p>
+        </section>
+        <section class="impact-card bad">
+          <span class="impact-label">Bad busywork run</span>
+          <strong>45/100</strong>
+          <p>Promised research and planning, then skipped tool use, artifact creation, and an evidence-backed verdict.</p>
+        </section>
+        <section class="impact-card decision">
+          <span class="impact-label">Next autonomy decision</span>
+          <strong>Stop</strong>
+          <p>One trace below the 50/100 floor blocks broader permissions until the failed behavior is corrected and re-scored.</p>
+        </section>
+      </div>
+    </header>
+
+    <section class="section" aria-labelledby="cases-title">
+      <h2 id="cases-title">1. Two Sanitized Synthetic Cases</h2>
+      <p class="section-intro">
+        Both cases are small enough to inspect quickly. They use committed public sample names and sanitized artifact labels,
+        not private session logs, account identifiers, tokens, or private machine paths.
+      </p>
+
+      <div class="case-grid">
+        <article class="case-card good" aria-labelledby="good-case-title">
+          <div class="case-heading good">
+            <span class="case-kicker">Case A</span>
+            <h3 id="good-case-title">Good delegated run</h3>
+            <span class="score-pill good">good_obsidian_task.jsonl, 100/100, Invest more</span>
+          </div>
+          <div class="case-body">
+            <ul class="replay-list">
+              <li>
+                <span class="replay-label">User ask</span>
+                <p>Research agent evaluation tools and write a concise note explaining why the work deserves attention.</p>
+              </li>
+              <li>
+                <span class="replay-label">Promise</span>
+                <p>The assistant says it will check sources, write the note, and verify it.</p>
+              </li>
+              <li>
+                <span class="replay-label">Evidence</span>
+                <p>Retrieval tool calls are followed by <code>write_file</code> to <code>artifacts/agent-eval-market.md</code> and a <code>read_file</code> verification pass.</p>
+              </li>
+              <li>
+                <span class="replay-label">Handoff</span>
+                <p>Final answer says the work is done, names the artifact, confirms verification, and explains why the result is worth further investment.</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="case-card bad" aria-labelledby="bad-case-title">
+          <div class="case-heading bad">
+            <span class="case-kicker">Case B</span>
+            <h3 id="bad-case-title">Bad busywork run</h3>
+            <span class="score-pill bad">bad_busywork_task.jsonl, 45/100, Do not delegate</span>
+          </div>
+          <div class="case-body">
+            <ul class="replay-list">
+              <li>
+                <span class="replay-label">User ask</span>
+                <p>Look at the market and decide whether the idea is worth doing.</p>
+              </li>
+              <li>
+                <span class="replay-label">Promise</span>
+                <p>The assistant says it will research the market and create a plan.</p>
+              </li>
+              <li>
+                <span class="replay-label">Evidence gap</span>
+                <p>No tool call follows the promise. No retrieval happens. No durable artifact appears.</p>
+              </li>
+              <li>
+                <span class="replay-label">Handoff</span>
+                <p>The final answer says the idea is obviously good, but gives no inspected artifact and no clear evidence-backed verdict.</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="caught-title">
+      <h2 id="caught-title">2. What The Evaluation Catches</h2>
+      <p class="section-intro">
+        The contrast is concrete: the scorecard rewards observable action and penalizes confident summaries that leave the human reviewer
+        with nothing to inspect.
+      </p>
+
+      <table class="evidence-table" aria-label="Failure replay evidence comparison">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Good delegated run</th>
+            <th>Bad busywork run</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Artifacts</td>
+            <td><span class="pass">PASS.</span> Durable output exists at <code>artifacts/agent-eval-market.md</code>.</td>
+            <td><span class="fail">FAIL.</span> <code>durable_artifact</code>: No durable artifact detected.</td>
+          </tr>
+          <tr>
+            <td>Verification</td>
+            <td><span class="pass">PASS.</span> The artifact is read back before the final answer.</td>
+            <td><span class="fail">FAIL.</span> There is no tool-backed work to verify.</td>
+          </tr>
+          <tr>
+            <td>Privacy</td>
+            <td><span class="pass">PASS.</span> Public proof uses synthetic descriptions, sanitized artifact labels, and no private identifiers.</td>
+            <td><span class="pass">PASS.</span> The sample is also public-safe; the failure is missing evidence, not secret leakage.</td>
+          </tr>
+          <tr>
+            <td>Handoff quality</td>
+            <td><span class="pass">PASS.</span> The handoff states done, names the output, confirms verification, and gives the delegation value.</td>
+            <td><span class="fail">FAIL.</span> <code>clear_verdict</code>: Final answer lacks clear outcome/verdict.</td>
+          </tr>
+          <tr>
+            <td>Autonomy decision</td>
+            <td><span class="pass">Increase autonomy cautiously.</span> Keep lightweight regression checks.</td>
+            <td><span class="fail">Stop delegation until fixed.</span> Do not expand permissions from this pattern.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" aria-labelledby="decision-title">
+      <h2 id="decision-title">3. How The Failed Replay Changes The Next Decision</h2>
+      <p class="section-intro">
+        The public portfolio has strong examples, but autonomy is gated by the weakest trace. A single 45/100 run below the
+        delegation floor means the reviewer should not grant broader file, network, or scheduled-run permissions for that agent pattern.
+      </p>
+
+      <pre>{"trace":"bad_busywork_task.jsonl","score":"45/100","verdict":"Do not delegate"}
+{"failure":"promised_action_executed: Assistant promised action but no tool call followed."}
+{"failure":"uses_tools_for_retrieval: Research/file/system claims had no retrieval tool evidence."}
+{"failure":"durable_artifact: No durable artifact detected."}</pre>
+
+      <div class="decision-panel" aria-label="Autonomy decision from failure replay">
+        <div>
+          <span class="impact-label">Decision after replay</span>
+          <strong>Stop delegation until fixed</strong>
+          <p>
+            The failed trace turns the next autonomy choice from "invest more" into "fix and re-score first."
+          </p>
+        </div>
+        <ul class="action-list">
+          <li>Do not increase permissions for this task pattern.</li>
+          <li>Require tool-backed retrieval when the agent promises research.</li>
+          <li>Require a durable artifact or explicit no-artifact rationale.</li>
+          <li>Require verification before a final handoff claims the work is done.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="proof-title">
+      <h2 id="proof-title">Public Proof Files</h2>
+      <p class="section-intro">
+        These committed files let a visitor inspect the replay path without installing Python or running a build. This page only links to sanitized public summaries.
+      </p>
+      <ul class="proof-links">
+        <li>
+          <a href="trace-walkthrough.html">Trace walkthrough</a>
+          <span>A browser-readable view of how trace events become checks, scores, and a trust decision.</span>
+        </li>
+        <li>
+          <a href="delegation-policy.html">Delegation policy</a>
+          <span>The same threshold logic as a browser-readable policy surface.</span>
+        </li>
+        <li>
+          <a href="portfolio-viewer.html">Portfolio viewer</a>
+          <span>A sanitized summary of the committed public examples and weakest-trace decision.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="proof-note" aria-label="Static and privacy note">
+      <p>
+        No external scripts, stylesheets, images, network requests, private traces, tokens, account IDs, or private machine paths are used by this page.
+      </p>
+      <p>
+        This page uses sanitized case summaries derived from the public examples. It does not embed private paths or raw private traces.
+      </p>
+    </section>
+  </main>
+</body>
+</html>
