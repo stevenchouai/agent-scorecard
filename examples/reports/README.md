@@ -8,6 +8,12 @@ PYTHONPATH=src python -m agent_scorecard.cli examples/traces/good_obsidian_task.
 
 Expected result: score in `Invest more` band because the trace shows source lookup, artifact creation, verification, and Steven-specific investment framing.
 
+Open the visitor walkthrough directly in a browser:
+
+[trace-walkthrough.html](trace-walkthrough.html)
+
+It shows the public-safe flow from a tiny trace, to scoring checks, to the resulting score and autonomy decision without requiring Python.
+
 The batch portfolio index is generated with:
 
 ```bash
