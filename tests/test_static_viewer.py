@@ -58,6 +58,43 @@ class StaticViewerTests(unittest.TestCase):
         self.assertNotIn("url(", lower_svg)
         self.assertNotIn("@import", lower_svg)
 
+    def test_delegation_policy_page_is_static_public_and_actionable(self) -> None:
+        html_path = REPORTS_DIR / "delegation-policy.html"
+        markdown_path = REPORTS_DIR / "delegation-policy.md"
+        html = html_path.read_text(encoding="utf-8")
+        markdown = markdown_path.read_text(encoding="utf-8")
+        combined = f"{html}\n{markdown}"
+
+        self.assertTrue(html_path.exists())
+        self.assertTrue(markdown_path.exists())
+        self.assertIn("<!doctype html>", html.lower())
+
+        for label in (
+            "Delegation Policy Simulator",
+            "Give more permissions",
+            "Keep supervised",
+            "Stop delegation until fixed",
+            "bad_busywork_task.jsonl",
+            "promised_action_executed: Assistant promised action but no tool call followed.",
+        ):
+            self.assertIn(label, combined)
+
+        for forbidden in (
+            "http://",
+            "https://",
+            "file://",
+            "/Users/",
+            "/private/",
+            "stevenchou",
+            "api_key",
+            "access_token",
+            "refresh_token",
+            "Authorization:",
+            "<script src",
+            "<link rel=\"stylesheet\"",
+        ):
+            self.assertNotIn(forbidden, combined)
+
 
 if __name__ == "__main__":
     unittest.main()

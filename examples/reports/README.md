@@ -19,3 +19,5 @@ The machine-readable JSON portfolio index is generated with:
 ```bash
 PYTHONPATH=src python -m agent_scorecard.cli --batch-dir examples/traces --summary --format json --output examples/reports/index.json
 ```
+
+Open `portfolio-viewer.html` for the public score summary, then use `delegation-policy.html` to turn the same sample data into an autonomy decision: give more permissions, keep supervised, or stop delegation until fixed.
