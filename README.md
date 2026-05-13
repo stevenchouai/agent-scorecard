@@ -92,6 +92,10 @@ For a 60-second no-install walkthrough of how one trace becomes checks, a score,
 
 [examples/reports/trace-walkthrough.html](examples/reports/trace-walkthrough.html)
 
+Use the delegation policy simulator to translate those scores into a next-step autonomy decision:
+
+[examples/reports/delegation-policy.html](examples/reports/delegation-policy.html)
+
 Generate the compact SVG badge from the same public summary data:
 
 ```bash
