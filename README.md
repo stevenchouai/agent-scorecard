@@ -100,6 +100,10 @@ See a failure replay that contrasts a good delegated run with a bad busywork run
 
 [examples/reports/failure-replay.html](examples/reports/failure-replay.html)
 
+Before sharing a trace for scoring, use the evidence intake checklist to prepare a public-safe capture:
+
+[examples/reports/evidence-intake.html](examples/reports/evidence-intake.html)
+
 Generate the compact SVG badge from the same public summary data:
 
 ```bash
