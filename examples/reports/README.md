@@ -33,3 +33,4 @@ Open `trust-contract.html` for the public trust contract that explains how trace
 Open `failure-replay.html` to see the public-safe contrast between a good delegated run and a bad busywork run, including the artifact, verification, privacy, handoff, and autonomy-decision differences.
 
 Open `evidence-intake.html` before sharing a trace for scoring. It lists what to capture, what to redact, what counts as proof, what blocks higher autonomy, and a small copy/paste checklist for preparing a public-safe agent trace.
+Open `scoring-dimensions.html` to see how the 7 scoring dimensions work: interactive cards with pass/fail signals, a radar chart comparing good and bad agents, and sample profiles that show how scores translate into autonomy decisions.

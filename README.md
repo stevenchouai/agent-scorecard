@@ -107,6 +107,9 @@ See a failure replay that contrasts a good delegated run with a bad busywork run
 Before sharing a trace for scoring, use the evidence intake checklist to prepare a public-safe capture:
 
 [examples/reports/evidence-intake.html](examples/reports/evidence-intake.html)
+Explore the 7 scoring dimensions with interactive cards, a radar chart, and sample agent profiles:
+
+[examples/reports/scoring-dimensions.html](examples/reports/scoring-dimensions.html)
 
 Generate the compact SVG badge from the same public summary data:
 
