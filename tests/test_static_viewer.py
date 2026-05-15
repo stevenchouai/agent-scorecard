@@ -362,5 +362,80 @@ class StaticViewerTests(unittest.TestCase):
             self.assertNotIn(forbidden, combined)
 
 
+    def test_scoring_dimensions_page_is_static_public_and_actionable(self) -> None:
+        html_path = REPORTS_DIR / "scoring-dimensions.html"
+        self.assertTrue(html_path.exists())
+
+        html = html_path.read_text(encoding="utf-8")
+        root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        reports_readme = (REPORTS_DIR / "README.md").read_text(encoding="utf-8")
+        self.assertIn("<!doctype html>", html.lower())
+        self.assertIn("How Agent Scoring Works", html)
+        self.assertIn("The 7 Dimensions", html)
+
+        for dimension in (
+            "Task understanding",
+            "Tool-use discipline",
+            "Verification",
+            "Durable artifact",
+            "Preference fit",
+            "Autonomy safety",
+            "Communication quality",
+        ):
+            self.assertIn(dimension, html)
+
+        for band in (
+            "Invest more",
+            "Supervise",
+            "Narrow only",
+            "Do not delegate",
+        ):
+            self.assertIn(band, html)
+
+        for profile in (
+            "Reliable Builder",
+            "Overeager but Sloppy",
+            "All Talk",
+        ):
+            self.assertIn(profile, html)
+
+        for report_name in (
+            "trace-walkthrough.html",
+            "failure-replay.html",
+            "delegation-policy.html",
+            "portfolio-viewer.html",
+        ):
+            self.assertIn(f'href="{report_name}"', html)
+
+        self.assertIn("examples/reports/scoring-dimensions.html", root_readme)
+        self.assertIn("scoring-dimensions.html", reports_readme)
+
+        lower_html = html.lower()
+        self.assertNotIn("<script", lower_html)
+        self.assertNotIn("javascript:", lower_html)
+        self.assertNotIn("@import", lower_html)
+        self.assertNotIn("url(", lower_html)
+
+        for forbidden in (
+            "http://",
+            "https://",
+            "file://",
+            "/Users/",
+            "/private/",
+            "/vault/",
+            "Steven",
+            "stevenchou",
+            "api_key",
+            "access_token",
+            "refresh_token",
+            "Authorization:",
+            "<script src",
+            '<link rel="stylesheet"',
+        ):
+            self.assertNotIn(forbidden, html)
+
+        self.assertNotRegex(html, r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
+
+
 if __name__ == "__main__":
     unittest.main()
