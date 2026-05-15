@@ -92,6 +92,68 @@ class StaticViewerTests(unittest.TestCase):
         self.assertIn("trace-walkthrough.html", reports_readme)
         self.assertIn('href="trace-walkthrough.html"', portfolio_html)
 
+    def test_evidence_intake_page_is_static_public_and_actionable(self) -> None:
+        html_path = REPORTS_DIR / "evidence-intake.html"
+        self.assertTrue(html_path.exists())
+
+        html = html_path.read_text(encoding="utf-8")
+        root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        reports_readme = (REPORTS_DIR / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("<!doctype html>", html.lower())
+
+        for phrase in (
+            "Agent Scorecard evidence intake",
+            "Prepare a public-safe agent trace before scoring.",
+            "What to capture",
+            "What to redact",
+            "What counts as proof",
+            "What blocks higher autonomy",
+            "Copy/paste checklist",
+            "public-safe user ask",
+            "Artifact paths are sanitized",
+            "Verification is present",
+            "Promise without action",
+            "Research with no retrieval",
+        ):
+            self.assertIn(phrase, html)
+
+        for report_name in (
+            "trace-walkthrough.html",
+            "failure-replay.html",
+            "delegation-policy.html",
+            "../../docs/evaluation-inputs.md",
+            "../../docs/trace-schema.md",
+        ):
+            self.assertIn(f'href="{report_name}"', html)
+
+        self.assertIn("examples/reports/evidence-intake.html", root_readme)
+        self.assertIn("evidence-intake.html", reports_readme)
+
+        lower_html = html.lower()
+        self.assertNotIn("<script", lower_html)
+        self.assertNotIn("javascript:", lower_html)
+        self.assertNotIn("@import", lower_html)
+        self.assertNotIn("url(", lower_html)
+
+        for forbidden in (
+            "http://",
+            "https://",
+            "file://",
+            "/" + "Users/",
+            "/" + "private/",
+            "stevenchou",
+            "api_key",
+            "access_token",
+            "refresh_token",
+            "Authorization:",
+            "<script src",
+            "<link rel=\"stylesheet\"",
+        ):
+            self.assertNotIn(forbidden, html)
+
+        self.assertNotRegex(html, r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
+
     def test_failure_replay_page_is_static_public_and_actionable(self) -> None:
         html_path = REPORTS_DIR / "failure-replay.html"
         self.assertTrue(html_path.exists())
@@ -147,8 +209,8 @@ class StaticViewerTests(unittest.TestCase):
             "http://",
             "https://",
             "file://",
-            "/Users/",
-            "/private/",
+            "/" + "Users/",
+            "/" + "private/",
             "/vault/",
             "Steven",
             "stevenchou",
@@ -287,8 +349,8 @@ class StaticViewerTests(unittest.TestCase):
             "http://",
             "https://",
             "file://",
-            "/Users/",
-            "/private/",
+            "/" + "Users/",
+            "/" + "private/",
             "stevenchou",
             "api_key",
             "access_token",
