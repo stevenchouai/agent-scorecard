@@ -96,6 +96,10 @@ Use the delegation policy simulator to translate those scores into a next-step a
 
 [examples/reports/delegation-policy.html](examples/reports/delegation-policy.html)
 
+Read the trust contract that explains how trace evidence becomes a score, a permission tier, and a stop condition:
+
+[examples/reports/trust-contract.html](examples/reports/trust-contract.html)
+
 See a failure replay that contrasts a good delegated run with a bad busywork run, then shows how the failed trace changes the next autonomy decision:
 
 [examples/reports/failure-replay.html](examples/reports/failure-replay.html)

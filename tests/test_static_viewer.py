@@ -163,6 +163,86 @@ class StaticViewerTests(unittest.TestCase):
 
         self.assertNotRegex(html, r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
 
+    def test_trust_contract_page_is_static_public_and_linked(self) -> None:
+        html_path = REPORTS_DIR / "trust-contract.html"
+        self.assertTrue(html_path.exists())
+
+        html = html_path.read_text(encoding="utf-8")
+        root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        reports_readme = (REPORTS_DIR / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("<!doctype html>", html.lower())
+        self.assertIn("Agent Scorecard trust contract", html)
+        self.assertIn("Steven's personal AI OS", html)
+        self.assertIn("trace evidence earns a score", html)
+        self.assertIn("public proof", html)
+        self.assertIn("agent evaluation", html)
+        self.assertIn("How to use this in a real agent run", html)
+
+        for anchor in (
+            'id="trace-evidence"',
+            'id="score"',
+            'id="permission-tiers"',
+            'id="stop-conditions"',
+            'id="real-agent-run"',
+        ):
+            self.assertIn(anchor, html)
+
+        for tier in (
+            "Observe only",
+            "Supervised draft",
+            "Bounded write",
+            "Broader delegation",
+        ):
+            self.assertIn(tier, html)
+
+        for phrase in (
+            "Required evidence",
+            "Stop condition",
+            "0-49: do not delegate",
+            "50-69: limited trust",
+            "70-84: supervised autonomy",
+            "85-100: invest more",
+            "trace evidence -> deterministic checks -> score -> verdict -> next permission",
+        ):
+            self.assertIn(phrase, html)
+
+        for report_name in (
+            "trace-walkthrough.html",
+            "portfolio-viewer.html",
+            "delegation-policy.html",
+            "failure-replay.html",
+        ):
+            self.assertIn(f'href="{report_name}"', html)
+
+        self.assertIn("examples/reports/trust-contract.html", root_readme)
+        self.assertIn("trust-contract.html", reports_readme)
+
+        lower_html = html.lower()
+        self.assertNotIn("<script", lower_html)
+        self.assertNotIn("javascript:", lower_html)
+        self.assertNotIn("@import", lower_html)
+        self.assertNotIn("url(", lower_html)
+
+        for forbidden in (
+            "http://",
+            "https://",
+            "file://",
+            "/Users/",
+            "/private/",
+            "/vault/",
+            "stevenchou",
+            "api_key",
+            "access_token",
+            "refresh_token",
+            "Authorization:",
+            "<script src",
+            "<link rel=\"stylesheet\"",
+        ):
+            self.assertNotIn(forbidden, html)
+
+        self.assertNotRegex(html, r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
+
     def test_portfolio_badge_matches_public_summary_payload(self) -> None:
         from agent_scorecard.report import to_portfolio_badge_svg
 
