@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from .anatomy import score_anatomy
 from .core import ScoreReport, score_events
 from .hermes_import import (
     HermesImportError,
@@ -205,6 +206,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--from-hermes-session", type=Path, help="Convert one Hermes session JSON file to scorecard JSONL")
     parser.add_argument("--audit-privacy", type=Path, metavar="TRACE", help="Audit one JSONL trace for obvious sensitive values")
+    parser.add_argument(
+        "--anatomy",
+        action="store_true",
+        help="Output a detailed per-check anatomy report instead of the standard report",
+    )
     args = parser.parse_args(argv)
 
     gate_requested = args.fail_under_average is not None or args.fail_under_min is not None
@@ -264,7 +270,11 @@ def main(argv: list[str] | None = None) -> int:
     if not args.trace:
         parser.error("trace is required unless --batch-dir is used")
 
-    rendered = score_trace(args.trace, args.format)
+    if args.anatomy:
+        anatomy_report = score_anatomy(load_jsonl(args.trace))
+        rendered = anatomy_report.to_markdown() + "\n"
+    else:
+        rendered = score_trace(args.trace, args.format)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
