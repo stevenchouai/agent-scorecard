@@ -1,0 +1,279 @@
+name: "Agent Scorecard"
+description: "Score agent workflow traces in CI. Generates portfolio summaries, quality badges, and enforces configurable quality gates."
+branding:
+  icon: "check-circle"
+  color: "green"
+
+inputs:
+  traces-dir:
+    description: "Directory containing .jsonl trace files"
+    required: false
+    default: "examples/traces"
+  format:
+    description: "Report output format (markdown or json)"
+    required: false
+    default: "markdown"
+  fail-under-average:
+    description: "Minimum average score (0-100) to pass. Set to 0 to disable."
+    required: false
+    default: "70"
+  fail-under-min:
+    description: "Minimum single-trace score (0-100) to pass. Set to 0 to disable."
+    required: false
+    default: "40"
+  post-comment:
+    description: "Post scoring results as a PR comment"
+    required: false
+    default: "true"
+  badge-output:
+    description: "Path to write the SVG portfolio badge"
+    required: false
+    default: "scorecard-badge.svg"
+
+outputs:
+  average-score:
+    description: "Average score across all traces"
+    value: ${{ steps.score.outputs.average-score }}
+  verdict:
+    description: "pass or fail"
+    value: ${{ steps.score.outputs.verdict }}
+  badge-path:
+    description: "Path to the generated SVG badge"
+    value: ${{ steps.score.outputs.badge-path }}
+  report-path:
+    description: "Path to the generated report"
+    value: ${{ steps.score.outputs.report-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install agent-scorecard
+      shell: bash
+      run: |
+        set -e
+        pip install -e ".[dev]"
+
+    - name: Score traces
+      id: score
+      shell: bash
+      env:
+        INPUT_TRACES_DIR: ${{ inputs.traces-dir }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_FAIL_UNDER_AVERAGE: ${{ inputs.fail-under-average }}
+        INPUT_FAIL_UNDER_MIN: ${{ inputs.fail-under-min }}
+        INPUT_BADGE_OUTPUT: ${{ inputs.badge-output }}
+      run: |
+        set +e  # Don't exit on scorecard failure; we need to post the comment
+
+        REPORTS_DIR=".scorecard-reports"
+        BADGE_PATH="${INPUT_BADGE_OUTPUT}"
+        SUMMARY_JSON="${REPORTS_DIR}/summary.json"
+        SUMMARY_REPORT="${REPORTS_DIR}/summary.$( [ "$INPUT_FORMAT" = "json" ] && echo json || echo md )"
+        OUTPUTS_FILE="${GITHUB_OUTPUT:-/dev/null}"
+
+        # Default outputs for no-traces case
+        echo "average-score=0" >> "$OUTPUTS_FILE"
+        echo "verdict=pass" >> "$OUTPUTS_FILE"
+        echo "badge-path=${BADGE_PATH}" >> "$OUTPUTS_FILE"
+        echo "report-path=" >> "$OUTPUTS_FILE"
+
+        TRACES_DIR="${INPUT_TRACES_DIR}"
+
+        # Check for trace files
+        if ! ls "${TRACES_DIR}"/*.jsonl 1>/dev/null 2>&1; then
+          echo "::warning::No .jsonl trace files found in ${TRACES_DIR}"
+          # Generate an empty badge
+          agent-scorecard --batch-dir "${TRACES_DIR}" --summary --format badge --output "${BADGE_PATH}" 2>/dev/null || true
+          exit 0
+        fi
+
+        TRACE_COUNT=$(ls -1 "${TRACES_DIR}"/*.jsonl 2>/dev/null | wc -l | tr -d ' ')
+        echo "::notice::Discovered ${TRACE_COUNT} trace file(s) in ${TRACES_DIR}"
+
+        mkdir -p "${REPORTS_DIR}"
+
+        # Build quality gate args
+        GATE_ARGS=""
+        avg_threshold="${INPUT_FAIL_UNDER_AVERAGE}"
+        min_threshold="${INPUT_FAIL_UNDER_MIN}"
+        [ -n "$avg_threshold" ] && [ "$avg_threshold" != "0" ] && GATE_ARGS="${GATE_ARGS} --fail-under-average ${avg_threshold}"
+        [ -n "$min_threshold" ] && [ "$min_threshold" != "0" ] && GATE_ARGS="${GATE_ARGS} --fail-under-min ${min_threshold}"
+
+        # Run portfolio scoring
+        # shellcheck disable=SC2086
+        agent-scorecard \
+          --batch-dir "${TRACES_DIR}" \
+          --summary \
+          --format json \
+          --output "${SUMMARY_JSON}" \
+          ${GATE_ARGS}
+        scorecard_exit=$?
+
+        # Generate report in requested format
+        agent-scorecard \
+          --batch-dir "${TRACES_DIR}" \
+          --summary \
+          --format "${INPUT_FORMAT}" \
+          --output "${SUMMARY_REPORT}"
+
+        # Generate SVG badge
+        agent-scorecard \
+          --batch-dir "${TRACES_DIR}" \
+          --summary \
+          --format badge \
+          --output "${BADGE_PATH}"
+
+        # Extract average score
+        AVERAGE_SCORE="0"
+        if command -v python3 &>/dev/null && [ -f "${SUMMARY_JSON}" ]; then
+          AVERAGE_SCORE=$(python3 -c "
+        import json, sys
+        try:
+            data = json.load(open('${SUMMARY_JSON}'))
+            print(f\"{data['average_score']:.1f}\")
+        except Exception:
+            print('0')
+        " 2>/dev/null) || AVERAGE_SCORE="0"
+        fi
+
+        if [ "$AVERAGE_SCORE" = "0" ] && [ -f "${SUMMARY_REPORT}" ]; then
+          AVERAGE_SCORE=$(grep -oP '(?<=\*\*Average score:\*\* )\d+(\.\d+)?' "${SUMMARY_REPORT}" 2>/dev/null | head -1) || AVERAGE_SCORE="0"
+        fi
+
+        # Determine verdict
+        VERDICT="pass"
+        if [ "$scorecard_exit" -ne 0 ]; then
+          VERDICT="fail"
+        fi
+
+        echo "::notice::Agent Scorecard: ${AVERAGE_SCORE}/100 — ${VERDICT^^}"
+
+        # Write final outputs
+        {
+          echo "average-score=${AVERAGE_SCORE}"
+          echo "verdict=${VERDICT}"
+          echo "badge-path=${BADGE_PATH}"
+          echo "report-path=${SUMMARY_REPORT}"
+        } >> "$OUTPUTS_FILE"
+
+        # Build PR comment via Python (use env vars to avoid heredoc escaping issues)
+        export SCORECARD_REPORT="${SUMMARY_REPORT}" \
+               SCORECARD_BADGE="${BADGE_PATH}" \
+               SCORECARD_AVG="${AVERAGE_SCORE}" \
+               SCORECARD_VERDICT="${VERDICT}" \
+               SCORECARD_TRACES="${TRACES_DIR}" \
+               SCORECARD_FORMAT="${INPUT_FORMAT}"
+        python3 - <<'PYEOF'
+        import base64, os, sys
+
+        def read_file(path):
+            try:
+                with open(path) as f:
+                    return f.read()
+            except Exception:
+                return ""
+
+        report = read_file(os.environ["SCORECARD_REPORT"])
+        badge_svg = read_file(os.environ["SCORECARD_BADGE"])
+        avg = os.environ["SCORECARD_AVG"]
+        verdict = os.environ["SCORECARD_VERDICT"]
+        fmt = os.environ.get("SCORECARD_FORMAT", "markdown")
+        traces = os.environ["SCORECARD_TRACES"]
+
+        badge_b64 = base64.b64encode(badge_svg.encode()).decode() if badge_svg else ""
+
+        verdict_emoji = "✅" if verdict == "pass" else "❌"
+        verdict_word = "PASSED" if verdict == "pass" else "FAILED"
+        color = "green" if verdict == "pass" else "red"
+
+        score_slug = avg.replace(".", "")
+        header = (
+            f"## {verdict_emoji} Agent Scorecard: {verdict_word}\n\n"
+            f"**Average Score:** {avg}/100 &nbsp; "
+            f"![score](https://img.shields.io/badge/score-{score_slug}/100-{color})\n\n"
+        )
+
+        badge_section = ""
+        if badge_b64:
+            badge_section = (
+                "### Portfolio Badge\n\n"
+                f'<img src="data:image/svg+xml;base64,{badge_b64}" '
+                'alt="Agent Scorecard badge" width="560">\n\n'
+            )
+
+        details = ""
+        if report:
+            details = (
+                f"<details><summary>View full {fmt} report</summary>\n\n"
+                f"```\n{report}\n```\n\n</details>\n"
+            )
+
+        body = header + badge_section + details
+        body += f"\n---\n<sub>Traces: <code>{traces}</code> | Format: <code>{fmt}</code></sub>\n"
+
+        with open(".scorecard-comment.md", "w") as f:
+            f.write(body)
+        PYEOF
+
+    - name: Final quality gate
+      shell: bash
+      env:
+        INPUT_VERDICT: ${{ steps.score.outputs.verdict }}
+      run: |
+        set -e
+        if [ "${INPUT_VERDICT}" = "fail" ]; then
+          echo "::error::Agent Scorecard quality gate failed. See comment above for details."
+          exit 1
+        fi
+        echo "✅ Agent Scorecard quality gate passed."
+
+    - name: Post PR comment
+      if: inputs.post-comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ github.token }}
+        PR_REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        set -e
+        COMMENT_FILE=".scorecard-comment.md"
+
+        if [ ! -f "${COMMENT_FILE}" ]; then
+          echo "::warning::No comment file found, skipping PR comment."
+          exit 0
+        fi
+
+        if [ -z "${PR_NUMBER}" ]; then
+          echo "::warning::Not a pull request event, skipping comment."
+          exit 0
+        fi
+
+        # Try gh CLI first, fall back to curl
+        if command -v gh &>/dev/null; then
+          echo "Posting comment via gh CLI..."
+          gh pr comment "${PR_NUMBER}" \
+            --repo "${PR_REPO}" \
+            --body-file "${COMMENT_FILE}" \
+            && echo "::notice::PR comment posted successfully." \
+            || echo "::warning::Failed to post PR comment via gh CLI."
+        else
+          echo "gh CLI not found, using curl..."
+          PR_API="https://api.github.com/repos/${PR_REPO}/issues/${PR_NUMBER}/comments"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${PR_API}" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "$(python3 -c "import json; print(json.dumps({'body': open('.scorecard-comment.md').read()}))")" \
+          )
+          if [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ]; then
+            echo "::notice::PR comment posted successfully via API."
+          else
+            echo "::warning::Failed to post PR comment via API (HTTP ${HTTP_CODE})."
+          fi
+        fi
