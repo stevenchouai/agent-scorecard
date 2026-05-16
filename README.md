@@ -111,6 +111,15 @@ Explore the 7 scoring dimensions with interactive cards, a radar chart, and samp
 
 [examples/reports/scoring-dimensions.html](examples/reports/scoring-dimensions.html)
 
+See exactly why each check passed or failed with per-check trace debugging — patterns searched, patterns found, and human-readable reasons:
+
+```bash
+PYTHONPATH=src python -m agent_scorecard.cli examples/traces/good_obsidian_task.jsonl --anatomy
+PYTHONPATH=src python -m agent_scorecard.cli examples/traces/bad_busywork_task.jsonl --anatomy
+```
+
+Read the full scoring anatomy reference in `docs/scoring-anatomy.md`.
+
 Generate the compact SVG badge from the same public summary data:
 
 ```bash
